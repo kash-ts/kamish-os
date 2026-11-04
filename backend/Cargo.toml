@@ -1,44 +1,15 @@
 [package]
-name = "kamish-core"
+name = "kamish-backend"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kamish Team"]
-description = "Core software for Kamish OS"
+description = "Metapackage bridging kamish-core, kamish-web, and kamish-ipc"
 
 [lib]
-name = "kamish_core"
+name = "kamish_backend"
 path = "src/lib.rs"
 
-[[bin]]
-name = "kamish"
-path = "src/main.rs"
-
 [dependencies]
-tokio = { version = "1.41", features = ["full"] }
-axum = { version = "0.8", features = ["ws", "multipart"] }
-tower = { version = "0.5" }
-tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-rand = "0.8"
-sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate", "chrono"] }
-chrono = { version = "0.4", features = ["serde"] }
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-sysinfo = "0.33"
-anyhow = "1.0"
-thiserror = "2.0"
-dotenvy = "0.15"
-uuid = { version = "1.29.0", features = ["v4", "serde"] }
-chrono-tz = "0.10.4"
-reqwest = { version = "0.12", features = ["json", "multipart"] }
-base64 = "0.22"
-argon2 = "0.5"
-
-[dev-dependencies]
-tokio = { version = "1.41", features = ["full", "test-util"] }
-tower = { version = "0.5", features = ["util"] }
-http-body-util = "0.1"
-tokio-tungstenite = "0.29"
-futures-util = "0.3"
-tempfile = "3"
+kamish-core = { path = "../crates/kamish-core" }
+kamish-web = { path = "../crates/kamish-web" }
+kamish-ipc = { path = "../crates/kamish-ipc" }
