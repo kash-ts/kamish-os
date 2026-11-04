@@ -1,0 +1,5 @@
+config BR2_PACKAGE_KAMISH_HEALTHCHECK
+	bool "kamish-healthcheck"
+	select BR2_PACKAGE_RAUC
+	help
+	  KAMISH OS post-boot verification and RAUC slot confirmation service.

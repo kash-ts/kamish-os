@@ -1,0 +1,21 @@
+[Unit]
+Description=KAMISH Core Smart Speaker Service
+After=network.target sound.target dbus.service
+Wants=sound.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/kamish
+Environment=RUST_LOG=info
+Environment=DATABASE_URL=sqlite:///data/kamish/kamish.db?mode=rwc
+Environment=PORT=80
+Environment=SMART_SPEAKER_DATA_DIR=/data/kamish
+ExecStart=/opt/kamish/bin/smart-speaker-backend
+Restart=always
+RestartSec=3
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target

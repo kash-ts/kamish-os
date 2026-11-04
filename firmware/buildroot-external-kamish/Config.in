@@ -1,0 +1,3 @@
+# External Config.in for KAMISH OS packages
+source "$BR2_EXTERNAL_KAMISH_PATH/package/kamish/Config.in"
+source "$BR2_EXTERNAL_KAMISH_PATH/package/kamish-healthcheck/Config.in"
