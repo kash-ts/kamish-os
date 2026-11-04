@@ -91,7 +91,7 @@
 
 ### 3.1. Windows-хост + WSL2
 
-Целевое железо — **ARM64** (Orange Pi), разработка идёт на **x86_64 Windows + WSL2**.
+Целевое железо — **ARM64** (целевой микрокомпьютер), разработка идёт на **x86_64 Windows + WSL2**.
 Прямая сборка в Windows не работает.
 
 **Симптом:** `error: error calling dlltool 'dlltool.exe': program not found`.
@@ -164,7 +164,7 @@ Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
 
 - WSL2 **не пробрасывает** ни микрофон, ни Bluetooth-адаптер хоста.
 - Для разработки используйте `KAMISH_AUDIO_SOURCE=mock`.
-- Реальная проверка голосового ввода возможна только на Armbian/Orange Pi.
+- Реальная проверка голосового ввода возможна только на целевом железе с Kamish Linux (Buildroot).
 - Не заявляйте, что «микрофон работает», если проверяли мок.
 
 ### 3.6. Модели и внешние бинарники

@@ -1,13 +1,13 @@
 # AGENTS.md — Инструкции и правила для ИИ-агентов (AI Coding Guidelines)
 
-Этот документ определяет правила поведения, архитектурные инварианты, стандарты кодирования и протоколы верификации для ИИ-агентов (Antigravity, Cursor, Windsurf, Claude Code и др.), работающих в репозитории **Smart Speaker**.
+Этот документ определяет правила поведения, архитектурные инварианты, стандарты кодирования и протоколы верификации для ИИ-агентов (Antigravity, Cursor, Windsurf, Claude Code и др.), работающих в репозитории **«Камыш» (Kamish)**.
 
 ---
 
 ## 1. Роль и ключевая миссия
 
 * **Роль:** Senior Embedded & Systems Rust Engineer / AI Pair Programmer.
-* **Миссия:** Развивать и поддерживать автономную встроенную умную колонку на базе одноплатного компьютера **Orange Pi Zero 3 (Allwinner H618, ARM64)**, микрофонного массива **Seeed ReSpeaker XVF3800** и акустической системы **GT-112** под управлением **Armbian Linux**.
+* **Миссия:** Развивать и поддерживать автономную встроенную умную колонку на базе микрокомпьютера ARM64 (Orange Pi 4 Pro / Allwinner A733), микрофонного массива **Seeed ReSpeaker XVF3800** и акустической системы **GT-112** под управлением **Kamish Linux (Buildroot)**.
 * **Единый источник правды (SSOT):**
   * **Рабочий процесс агента: [`docs/AGENT_PLAYBOOK.md`](docs/AGENT_PLAYBOOK.md)** — обязательное чтение перед первой правкой
   * Архитектура: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
@@ -16,6 +16,7 @@
   * Дорожная карта и статус: [`docs/ROADMAP.md`](docs/ROADMAP.md)
   * Спецификация API: [`docs/API.md`](docs/API.md)
   * Аппаратные схемы и распиновка: [`docs/HARDWARE.md`](docs/HARDWARE.md)
+  * Очередь задач по кодовой базе: [`docs/CODE_TASKS.md`](docs/CODE_TASKS.md)
 
 > [!NOTE]
 > Этот документ задаёт **правила**. Как именно действовать, чтобы не переделывать,
@@ -33,7 +34,7 @@
 3. **Никаких обходов Tool Registry:** Модель ИИ-оркестратора **не имеет** прямого доступа к Shell, системным файлам или секретам хоста. Вся работа с колонкой ведётся строго через типизированные инструменты (14 tools).
 4. **Никакого ухудшения тестов:** Запрещено отключать, комментировать (`#[ignore]`) или удалять существующие тесты для создания иллюзии работоспособности. Все тесты должны проходить зелёным цветом.
 5. **Никакого визуального мусора («AI Slop»):** Фронтенд должен соответствовать правилам `kill-ai-slop`: строгий, функциональный дизайн без фиолетовых «нейросетевых» градиентов, смайликов в заголовках и избыточных декораций.
-6. **Никаких внешних HTTP REST API для ИИ:** Категорически запрещено подключать внешние сторонние облачные REST API (Gemini API, OpenAI API и др.) напрямую в ядро. Взаимодействие с ИИ осуществляется СТРОГО через локальный процесс Antigravity CLI (`agy` через stdin/stdout) либо через автономную локальную заглушку (`MockAiClient`).
+6. **Запрет на облачные сервисы для STT и TTS:** Распознавание речи (STT) и синтез голоса (TTS) обязаны выполняться **строго локально на устройстве** (Vosk, Piper, RHVoice, автономный WAV-генератор). Категорически запрещено использовать сторонние облачные Whisper или Cloud TTS API. При этом языковая модель (LLM через процесс Antigravity CLI `agy`) и стриминг музыки (YouTube Music) работают с облаком — прямое подключение облачных REST API в обход CLI `agy` запрещено.
 
 ### 🟢 Обязательно к исполнению (ALWAYS)
 1. **Принцип Offline-First:** Базовые функции устройства (будильники, напоминания, локальный звук, системные статусы, веб-панель) обязаны работать автономно без интернета и облачного ИИ.
@@ -78,17 +79,19 @@ cd frontend && npm run build
 
 | Подсистема | Путь в проекте | Ключевые технологии и особенности |
 |---|---|---|
-| **Ядро Backend** | `backend/src/` | Rust 2021, Tokio, Axum 0.7, Tracing |
-| **База данных** | `backend/src/database/`, `database/migrations/` | SQLite WAL, SQLx с компилируемыми миграциями `sqlx::migrate!` |
+| **Ядро Backend** | `backend/src/` | Rust 2021, Tokio, Axum 0.8, Tracing |
+| **Аутентификация** | `backend/src/auth/` | Хэширование Argon2id, сессии SQLite, cookie `kamish_session`, Middleware блокировки |
+| **Мастер настройки** | `backend/src/setup/` | Setup Wizard (5 этапов), хранение в `device_state`, диагностические пробы, WS события |
+| **База данных** | `backend/src/database/`, `database/schema.sql` | SQLite WAL, единая схема `schema.sql` (PRAGMA user_version) |
 | **Планировщик** | `backend/src/scheduler/` | `SchedulerEngine`, поддержка Cron-подобных правил, Timezone, SQLite репозиторий |
 | **Аудио-алерты** | `backend/src/audio/alert.rs` | Автономный математический синтезатор WAV-тонов (без внешних зависимостей) |
 | **AI-оркестратор** | `backend/src/ai/` | Antigravity CLI процесс, сессии диалогов, реестр из 14 инструментов, `MockAiClient` |
-| **Мультимедиа** | `backend/src/music/` | Headless MPV через IPC UNIX-сокет, радио, локальные рекомендации, mock-фоллбэк |
+| **Мультимедиа** | `backend/src/music/` | Headless MPV через IPC UNIX-сокет, радио, рекомендации YouTube Music, mock-фоллбэк |
 | **Речь (Speech)** | `backend/src/speech/` | VAD на чистом Rust (RMS + ZCR), споттер ключевых слов, модульные STT/TTS |
 | **Системный стек** | `backend/src/system/` | Bluetooth A2DP (BlueZ), Wi-Fi (nmcli), Setup AP, Happ VLESS Reality, шина событий WS |
-| **Аппаратура** | `backend/src/hardware/` | Мониторинг Allwinner H618 (`sysfs`), троттлинг ($\ge 80^\circ\text{C}$), лимитер громкости 85% |
+| **Аппаратура** | `backend/src/system/hardware.rs` | Мониторинг процессора (`sysfs`), троттлинг ($\ge 80^\circ\text{C}$), лимитер громкости 85% |
 | **Фронтенд** | `frontend/src/` | React 19, TypeScript, Vite, Tailwind CSS, отдача через Axum `ServeDir` |
-| **Развёртывание** | `deploy/` | Скрипты для Armbian Bookworm, udev-правила для XVF3800, systemd служба |
+| **Развёртывание** | `deploy/`, `firmware/` | Сборка прошивки Kamish Linux (Buildroot), udev-правила для XVF3800, systemd служба |
 
 ---
 

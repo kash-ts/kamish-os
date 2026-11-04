@@ -2,7 +2,7 @@
 
 ## Architecture
 - **Backend**: Rust 2021, Tokio, Axum 0.8, SQLx SQLite WAL, Argon2id password hashing, native HTTP cookie/header session management.
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Lucide icons, strict monochrome minimalist design (D-Link / MTS reference), native WebSocket client.
+- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Lucide icons, строгий светлый минималистичный дизайн (темная тема запрещена), нативный WebSocket клиент.
 - **Data Flow**:
   - `POST /api/v1/auth/login` -> Argon2id verification -> SQLite `auth_sessions` -> returns session token & Set-Cookie.
   - `Axum Middleware` -> validates token on `/api/v1/*` routes; enforces `must_change_password` (blocks with 403 `PASSWORD_CHANGE_REQUIRED`).
@@ -11,7 +11,7 @@
   - `POST /api/v1/setup/step` -> saves progress in `device_state` -> emits `setup_step_updated` on WebSocket.
   - `POST /api/v1/setup/complete` -> marks `setup:completed = true` in `device_state` -> emits `setup_completed` on WebSocket.
   - `POST /api/v1/setup/simulate-degradation` -> controlled degradation injection for zero-mock testing.
-  - `Frontend`: Single-page app with `/login`, forced `/change-password`, `/setup` (with non-destructive recovery), and Dashboard with fixed D-Link sidebar (9 sections).
+  - `Frontend`: SPA со светлой темой (без темной темы), экранами `/login`, forced `/change-password`, пошаговым `/setup` и фиксированным сайдбаром (9 разделов).
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
@@ -22,7 +22,7 @@
 | 4 | Setup Wizard Persistence | SQLite `device_state` storage for wizard progress & completion | M2 | R2 |
 | 5 | Setup Wizard Endpoints | `/status`, `/step`, `/complete`, `/diagnostics`, `/simulate-degradation` | M2 | R2 |
 | 6 | Subsystem Health & Recovery | Live probes (STT/TTS, AI CLI, audio, network, hardware), recovery redirection | M2 | R2 |
-| 7 | Monochrome D-Link UI Design | Light monochrome theme, high contrast borders, zero AI-slop | M3 | R3 |
+| 7 | Light Minimalist UI Design | Строгая светлая тема (темная тема запрещена), чистый дизайн без AI-slop | M3 | R3 |
 | 8 | Login & Password Change Screens | Centered login card, blocking forced password change view | M3 | R3 |
 | 9 | Setup Wizard Component | Step-by-step verification, non-destructive degradation recovery | M3 | R3 |
 | 10 | Dashboard & Fixed Sidebar | 9 navigation sections, real-time status indicator, zero mocks | M3 | R3 |
@@ -31,15 +31,15 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Backend Auth Subsystem | Cargo `argon2`, `0002_auth_schema.sql`, `backend/src/auth/`, `/api/v1/auth/*`, middleware | none | IN_PROGRESS |
-| M2 | Backend Setup Wizard | `SetupRepository`, `/api/v1/setup/*`, diagnostic probes, WS events | none | IN_PROGRESS |
-| M3 | Frontend Minimalist Overhaul | D-Link layout, Login, Change Password, Setup Wizard, 9 views, zero-mock | none | IN_PROGRESS |
-| M4 | Integration & Quality Gates | End-to-end verification, cargo test, npm run build, forensic audit | M1, M2, M3 | PLANNED |
+| M1 | Backend Auth Subsystem | Cargo `argon2`, `database/schema.sql`, `backend/src/auth/`, `/api/v1/auth/*`, middleware | none | COMPLETED |
+| M2 | Backend Setup Wizard | `SetupRepository`, `/api/v1/setup/*`, diagnostic probes, WS events | none | COMPLETED |
+| M3 | Frontend Application | Светлая минималистичная тема (темная тема запрещена), Login, Change Password, Setup Wizard, 9 разделов | none | COMPLETED |
+| M4 | Integration & Quality Gates | End-to-end verification, tests, forensic audit | M1, M2, M3 | IN_PROGRESS |
 
 ## Code Layout & Write Boundaries
 - **Worker 1 (Backend Auth - M1)** exclusively owns:
   - `backend/Cargo.toml`
-  - `database/migrations/0002_auth_schema.sql`
+  - `database/schema.sql`
   - `backend/src/auth/`
   - `backend/src/api/auth.rs`
   - `backend/tests/api_auth_test.rs`

@@ -18,11 +18,11 @@
 | RAM | 4 GB | **4 GB** (подтверждено) |
 
 **Код к плате НЕ привязан:** `detect_board_model()` (`backend/src/system/mod.rs`)
-читает `/proc/device-tree/model` и `/etc/armbian-release`. Работает на любой плате.
+читает `/proc/device-tree/model` и `/etc/os-release`. Работает на любой плате.
 
-**Документация устарела** — в `docs/HARDWARE.md`, `docs/SPECIFICATION.md`,
-`docs/ARCHITECTURE.md`, `docs/DECISIONS.md` везде «Orange Pi Zero 3 / H618».
-Это надо править, но владелец ещё не просил.
+**Документация актуализирована:** в `docs/HARDWARE.md`, `docs/SPECIFICATION.md`,
+`docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/ROADMAP.md` зафиксированы плата Orange Pi 4 Pro
+(Allwinner A733), ОС Kamish Linux (Buildroot), Lavalink v4 и единая схема SQLite `schema.sql`.
 
 Лимиты памяти из `SPECIFICATION.md`:
 - idle-потребление бэкенда: `≈25 MB`, бюджет `≤60 MB`, жёсткий лимит `≤150 MB` RSS
