@@ -63,7 +63,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <div className="flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
               <span className="text-xs font-medium text-slate-600">
-                Устройство в сети • Модель: {status?.hardware?.model || status?.device.hardware_model || 'Orange Pi Zero 3'}
+                Устройство в сети • Модель: {status?.hardware?.model || status?.device.hardware_model || 'kamish'}
               </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight">
@@ -166,7 +166,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               {status?.hardware?.cpu_cores ?? status?.device.cpu_count ?? 4} <span className="text-xs font-normal text-slate-500">ядер</span>
             </div>
             <div className="text-xs font-mono text-slate-500 truncate">
-              {status?.hardware?.cpu_arch || status?.device.arch || '—'} • {status?.hardware?.model || status?.device.hardware_model || 'Orange Pi Zero 3'}
+              {status?.hardware?.cpu_arch || status?.device.arch || '—'} • {status?.hardware?.model || status?.device.hardware_model || 'kamish'}
             </div>
           </div>
         </Card>

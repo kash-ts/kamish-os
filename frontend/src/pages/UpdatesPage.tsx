@@ -143,7 +143,7 @@ export const UpdatesPage: React.FC = () => {
             <div className="py-2.5 flex items-center justify-between">
               <span className="text-slate-500">Текущая версия ОС:</span>
               <span className="font-mono text-slate-900 font-medium">
-                {updateStatus?.installed_version || 'v0.1.0-armbian'}
+                {updateStatus?.installed_version || 'v0.1.0-buildroot'}
               </span>
             </div>
             <div className="py-2.5 flex items-center justify-between">
