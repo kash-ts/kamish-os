@@ -14,37 +14,51 @@ graph TD
     User -->|Web UI: HTTP / WebSocket| WebUI["Vite + React SPA\n(frontend/dist)"]
     User -->|Bluetooth A2DP| BlueZ["BlueZ / BlueALSA"]
 
-    ReSpeaker -->|USB Audio| Backend
-    WebUI -->|Axum HTTP / WS| Backend["Rust Backend (Axum + Tokio)"]
-    BlueZ -->|ALSA PCM| Backend
+    ReSpeaker -->|USB Audio| Core["kamish-core Daemon\n(24/7 Hardware Engine)"]
+    BlueZ -->|ALSA PCM| Core
 
-    subgraph Backend_Monolith ["Rust Backend Monolith"]
-        API["Axum HTTP & WS Router"]
+    WebUI -->|HTTP / WS :8080| Web["kamish-web Daemon\n(Axum Web Panel Backend)"]
+    Web -->|UNIX Socket IPC\n/run/kamish/core.sock| Core
+
+    subgraph Kamish_Web ["kamish-web (Web Layer)"]
+        WebAxum["Axum Web & WS Server"]
+        WebAuth["Auth Middleware (Argon2id)"]
+        WebDb["Web DB (web.db:\nusers, auth_sessions)"]
+        IpcCl["IPC Client (Length-delimited JSON)"]
+    end
+
+    subgraph Kamish_Core ["kamish-core (Speaker Core Engine)"]
+        IpcSrv["IPC Server (Length-delimited JSON)"]
         EventBus["Шина событий (broadcast::channel)"]
         Scheduler["Scheduler Engine (Tokio + chrono-tz)"]
         AudioMgr["Audio Output Manager\n(Safe Volume Ceiling: 85%)"]
         SpeechMgr["Speech Manager (RMS/ZCR VAD, Spotter, TTS/STT)"]
         AiOrch["AI Orchestrator\n(Strict Tool Registry: 14 tools)"]
-        MusicMgr["Music Manager (MPV IPC, Radio, Recommendations)"]
+        MusicMgr["Music Manager (Lavalink v4 / MPV, Recommendations)"]
         NetMgr["Network Manager (nmcli, Setup AP)"]
         VpnMgr["VPN Manager (Happ / VLESS Reality)"]
-        DbPool["SQLite WAL DB (schema.sql / user_version)"]
+        CoreDb["Core DB (core.db:\nsettings, alarms, reminders, history)"]
     end
 
-    Backend -->|Line Out / PCM| GT112["Акустическая система GT-112\n(Усилитель + динамики)"]
-    Backend -->|CLI Subprocess| AntigravityCLI["Antigravity CLI (LLM)"]
-    Backend -->|UNIX IPC Socket| MPV["Headless MPV Player"]
+    Core -->|Line Out / PCM| GT112["Акустическая система GT-112\n(Усилитель + динамики)"]
+    Core -->|CLI Subprocess| AntigravityCLI["Antigravity CLI (LLM)"]
+    Core -->|UNIX IPC Socket| MPV["Headless MPV Player"]
 ```
 
 ---
 
-## 2. Архитектура подсистем
+## 2. Архитектура подсистем (Разделение процессов)
 
-### 2.1. Backend Core (`backend/src/`)
+Архитектура системы разделена на два изолированных процесса и общую библиотеку протокола:
+- **`kamish-core`** (`crates/kamish-core`): автономное ядро колонки, работающее 24/7. Владеет всем железом (аудио, микрофоны ReSpeaker XVF3800, Bluetooth, Wi-Fi/NetworkManager), локальным планировщиком задач (будильники, напоминания), синтезом речи (TTS/STT), музыкальным воспроизведением и локальной базой `core.db`. Слушает UNIX-сокет IPC `/run/kamish/core.sock`. Не имеет зависимостей от веб-сервера Axum.
+- **`kamish-web`** (`crates/kamish-web`): легковесный бэкенд панели управления. Предоставляет HTTP REST API (`/api/v1/*`), раздачу SPA статики с клиенто-ориентированным роутингом, WebSocket стриминг событий, авторизацию пользователей (Argon2id) и хранит сессии в изолированной `web.db`. Все действия над устройством проксирует в `kamish-core` через типизированный IPC-клиент. При перезапуске или недоступности ядра возвращает 503 `CORE_OFFLINE`.
+- **`kamish-ipc`** (`crates/kamish-ipc`): общая библиотека протокола взаимодействия между `kamish-web` и `kamish-core`. Реализует строго типизированные сообщения (`CoreRequest`, `CoreResponse`, `CoreEvent`), кадрирование через длину (length-delimited JSON framing), а также сервер и клиент на базе `tokio::net::UnixStream`.
+
+### 2.1. kamish-core Daemon (`crates/kamish-core/src/`)
 - **Tokio Runtime**: многопоточный асинхронный планировщик задач.
-- **Axum Web Framework**: HTTP-сервер, раздающий как REST API (`/api/v1/*`), так и скомпилированный фронтенд через `tower_http::services::ServeDir` с авто-фоллбэком на `index.html`.
-- **SQLx + SQLite**: реляционная база данных в режиме WAL (Write-Ahead Logging). Единая схема базы данных `database/schema.sql` встроена в бинарный файл через `include_str!` и применяется при запуске; версионирование контролируется через `PRAGMA user_version`.
-- **WebSocket Event Bus**: централизованный `broadcast::channel`, рассылающий системные события (`AlarmFired`, `AlarmToggled`, `ReminderTriggered`, `MusicTrackChanged`, `VolumeChanged`, `HardwareWarning`) подключенным клиентам.
+- **IPC Server**: обработчик входящих команд от `kamish-web` через сокет `/run/kamish/core.sock`.
+- **SQLx + SQLite**: реляционная база данных ядра в режиме WAL (`core.db`). Схема `database/schema.sql` содержит таблицы настроек, будильников, напоминаний, сессий ИИ и истории музыки.
+- **Шина событий (Event Bus)**: централизованный `broadcast::channel`, рассылающий системные события (`CoreEvent`), которые транслируются клиентам IPC и далее в WebSockets.
 
 ### 2.2. AI Orchestrator & Tool Registry (`backend/src/ai/`)
 Языковая модель работает в условиях строгой изоляции:
@@ -128,7 +142,7 @@ CLI `agy` не входит в поставку: он проприетарный
 ## 3. Модель безопасности
 
 1. **Принцип наименьших привилегий**:
-   - Служба `kamish.service` выполняется с ограничениями `ProtectSystem=strict`, `ProtectHome=true`, `PrivateTmp=true`, `NoNewPrivileges=true`.
+   - Службы `kamish-core.service` и `kamish-web.service` выполняются от пользователя `kamish` с ограничениями `ProtectSystem=strict`, `ProtectHome=true`, `PrivateTmp=true`, `NoNewPrivileges=true`. Ядро `kamish-core` получает доступ к звуковым устройствам и сетевым возможностям (`CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_SYS_NICE`), тогда как веб-интерфейс `kamish-web` изолирован от прямого доступа к оборудованию.
 2. **Аутентификация и контроль паролей**:
    - Защита сессионными куками `HttpOnly` и токенами на всех бизнес-маршрутах.
    - Принудительная блокировка доступа до смены дефолтного пароля администратора.
