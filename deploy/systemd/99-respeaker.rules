@@ -1,0 +1,13 @@
+# udev rules for Seeed Technology ReSpeaker XVF3800 4-Mic Array
+# USB Vendor ID: 2886 (Seeed Technology Co., Ltd.)
+
+# Grant audio group access and disable USB autosuspend for low-latency recording
+SUBSYSTEM=="usb", ATTR{idVendor}=="2886", MODE="0660", GROUP="audio", TAG+="uaccess", ATTR{power/control}="on"
+
+# Specific match for ReSpeaker XVF3800
+SUBSYSTEM=="usb", ATTR{idVendor}=="2886", ATTRS{idProduct}=="0018", MODE="0660", GROUP="audio", TAG+="uaccess", ATTR{power/control}="on"
+SUBSYSTEM=="usb", ATTR{idVendor}=="2886", ATTRS{idProduct}=="0019", MODE="0660", GROUP="audio", TAG+="uaccess", ATTR{power/control}="on"
+
+# ALSA sound subsystem permissions
+KERNEL=="pcmC*D*c", SUBSYSTEM=="sound", ATTRS{idVendor}=="2886", MODE="0660", GROUP="audio"
+KERNEL=="controlC*", SUBSYSTEM=="sound", ATTRS{idVendor}=="2886", MODE="0660", GROUP="audio"
