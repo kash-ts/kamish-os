@@ -45,7 +45,7 @@ class KamishMockHandler(http.server.BaseHTTPRequestHandler):
                     "cpu_count": 4,
                     "arch": "aarch64",
                     "system_uptime_secs": 86400,
-                    "os": "Armbian Linux"
+                    "os": "Kamish Linux (Buildroot)"
                 },
                 "database": {"connected": True, "applied_migrations": 1},
                 "subsystems": {

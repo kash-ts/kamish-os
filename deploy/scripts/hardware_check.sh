@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Smart Speaker Hardware Diagnostic Script
-# Platform: Orange Pi Zero 3 (Allwinner H618, 4GB RAM) + Armbian Debian ARM64
+# Kamish Hardware Diagnostic Script
+# Platform: ARM64 (4GB RAM) + Kamish Linux (Buildroot ARM64)
 # Peripherals: Seeed ReSpeaker XVF3800, GT-112 Audio Output
 # ==============================================================================
 
@@ -15,7 +15,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 echo -e "\n${BOLD}${CYAN}================================================================${NC}"
-echo -e "${BOLD}${CYAN}   SMART SPEAKER HARDWARE DIAGNOSTICS & TELEMETRY VERIFIER      ${NC}"
+echo -e "${BOLD}${CYAN}      KAMISH HARDWARE DIAGNOSTICS & TELEMETRY VERIFIER          ${NC}"
 echo -e "${BOLD}${CYAN}================================================================${NC}\n"
 
 PASS_COUNT=0
@@ -35,14 +35,14 @@ ARCH=$(uname -m)
 if [[ "${ARCH}" == "aarch64" ]]; then
     record_pass "CPU Architecture: ${ARCH} (ARM64 target platform)"
 else
-    record_warn "CPU Architecture: ${ARCH} (Target is aarch64 Orange Pi Zero 3)"
+    record_warn "CPU Architecture: ${ARCH} (Target is aarch64 ARM64)"
 fi
 
 BOARD_MODEL="Unknown"
 if [[ -f "/proc/device-tree/model" ]]; then
     BOARD_MODEL=$(tr -d '\0' < /proc/device-tree/model)
-elif [[ -f "/etc/armbian-release" ]]; then
-    BOARD_MODEL=$(grep -E "^BOARD_NAME=" /etc/armbian-release | cut -d'=' -f2 | tr -d '"')
+elif [[ -f "/etc/os-release" ]]; then
+    BOARD_MODEL=$(grep -E "^(PRETTY_NAME|NAME)=" /etc/os-release | head -n1 | cut -d'=' -f2 | tr -d '"')
 fi
 echo -e "     Model: ${BOARD_MODEL}"
 

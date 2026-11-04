@@ -1,7 +1,7 @@
-//! Real microphone capture via the ALSA `arecord` utility (Armbian / Orange Pi target).
+//! Real microphone capture via the ALSA `arecord` utility (Buildroot / Linux target).
 //!
 //! `arecord` is used instead of a native ALSA or `cpal` binding because it is present
-//! on every Armbian image, needs no extra build-time C dependencies, and streams raw
+//! on the Buildroot image, needs no extra build-time C dependencies, and streams raw
 //! PCM on stdout where it is trivially framed. The source reports itself unavailable
 //! when the binary or the device is missing, so the caller can fall back honestly.
 

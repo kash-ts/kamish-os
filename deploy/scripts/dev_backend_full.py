@@ -85,7 +85,7 @@ class KamishFullBackendHandler(http.server.BaseHTTPRequestHandler):
                     "cpu_count": 8,
                     "arch": "aarch64",
                     "system_uptime_secs": 142800,
-                    "os": "Armbian Linux (Orange Pi 4 Pro / Allwinner A733)"
+                    "os": "Kamish Linux (Buildroot ARM64)"
                 },
                 "database": {"connected": True, "applied_migrations": 1},
                 "subsystems": {

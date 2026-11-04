@@ -116,9 +116,9 @@ async fn test_board_model_detector() {
     let model = detect_board_model_from_sources(Some(dt), None);
     assert_eq!(model, "Orange Pi Zero 3");
 
-    // Armbian release file
-    let armbian = "BOARD=orangepizero3\nBOARD_NAME=\"Orange Pi Zero 3\"\nVERSION=24.2.1\n";
-    let model2 = detect_board_model_from_sources(None, Some(armbian));
+    // Release file
+    let release = "BOARD=orangepizero3\nBOARD_NAME=\"Orange Pi Zero 3\"\nVERSION=24.2.1\n";
+    let model2 = detect_board_model_from_sources(None, Some(release));
     assert_eq!(model2, "Orange Pi Zero 3");
 
     // Fallback

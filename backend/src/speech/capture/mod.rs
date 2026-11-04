@@ -6,7 +6,7 @@
 //! * [`MockAudioSource`] — deterministic synthetic frames for x86_64/WSL and tests where
 //!   no physical microphone exists. Never claims real hardware.
 //! * [`ArecordAudioSource`] — real capture via the `arecord` ALSA utility, used on the
-//!   Orange Pi Zero 3 / Armbian target.
+//!   Linux / Buildroot target.
 //!
 //! The [`CaptureLoop`] glues a source to VAD, wake-word spotting, STT, the AI
 //! orchestrator and TTS playback.
