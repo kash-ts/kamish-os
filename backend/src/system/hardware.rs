@@ -42,7 +42,7 @@ pub struct HardwareTelemetry {
 }
 
 /// Parse temperature value from sysfs content.
-/// On Linux/Armbian, `/sys/class/thermal/thermal_zone0/temp` contains millidegrees (e.g. "45000" = 45.0°C).
+/// On Linux, `/sys/class/thermal/thermal_zone0/temp` contains millidegrees (e.g. "45000" = 45.0°C).
 pub fn parse_sysfs_temperature(content: &str) -> Option<f32> {
     let trimmed = content.trim();
     if let Ok(milli) = trimmed.parse::<i64>() {
@@ -70,7 +70,7 @@ pub fn read_cpu_temperature_from_path(path: &Path) -> Option<f32> {
 /// 2. `/sys/class/hwmon/hwmon0..4/temp1_input`
 /// 3. `sysinfo::Components`
 pub fn read_cpu_temperature() -> Option<f32> {
-    // 1. Sysfs thermal zones (standard on Allwinner H618 / Armbian)
+    // 1. Sysfs thermal zones (standard on Allwinner / Linux)
     for zone in 0..5 {
         let p = format!("/sys/class/thermal/thermal_zone{zone}/temp");
         if let Some(t) = read_cpu_temperature_from_path(Path::new(&p)) {
@@ -179,10 +179,10 @@ pub fn detect_respeaker() -> RespeakerInfo {
     detect_respeaker_with_sources(asound_cards.as_deref(), Path::new("/sys/bus/usb/devices"))
 }
 
-/// Detect board hardware model from device tree or armbian-release files.
+/// Detect board hardware model from device tree or release files.
 pub fn detect_board_model_from_sources(
     device_tree_model: Option<&str>,
-    armbian_release: Option<&str>,
+    release_info: Option<&str>,
 ) -> String {
     if let Some(model) = device_tree_model {
         let clean = model.trim_matches('\0').trim();
@@ -190,9 +190,14 @@ pub fn detect_board_model_from_sources(
             return clean.to_string();
         }
     }
-    if let Some(armbian) = armbian_release {
-        for line in armbian.lines() {
+    if let Some(info) = release_info {
+        for line in info.lines() {
             if let Some(stripped) = line.strip_prefix("BOARD_NAME=") {
+                let name = stripped.trim_matches('"').trim();
+                if !name.is_empty() {
+                    return name.to_string();
+                }
+            } else if let Some(stripped) = line.strip_prefix("PRETTY_NAME=") {
                 let name = stripped.trim_matches('"').trim();
                 if !name.is_empty() {
                     return name.to_string();
@@ -206,8 +211,10 @@ pub fn detect_board_model_from_sources(
 /// Detect host board model on live host.
 pub fn detect_board_model() -> String {
     let dt_model = std::fs::read_to_string("/proc/device-tree/model").ok();
-    let armbian = std::fs::read_to_string("/etc/armbian-release").ok();
-    detect_board_model_from_sources(dt_model.as_deref(), armbian.as_deref())
+    let release = std::fs::read_to_string("/etc/os-release")
+        .or_else(|_| std::fs::read_to_string("/etc/buildroot-release"))
+        .ok();
+    detect_board_model_from_sources(dt_model.as_deref(), release.as_deref())
 }
 
 /// Read current CPU frequency in MHz from cpufreq sysfs.

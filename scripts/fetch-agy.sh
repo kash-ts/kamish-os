@@ -44,7 +44,7 @@ case "${MACHINE}" in
     *) warn "Неподдерживаемая архитектура: ${MACHINE}"; exit 0 ;;
 esac
 
-# Buildroot-образы Armbian/Orange Pi собраны с musl; если доступен musl-вариант
+# Buildroot-образы Kamish Linux собраны с musl; если доступен musl-вариант
 # и сборка идёт для musl-таргета, предпочитаем его (glibc-бинарь там не стартует).
 if [ "${KAMISH_AGY_LIBC:-}" = "musl" ]; then
     case "${ASSET_PATTERN}" in
