@@ -1,10 +1,10 @@
-# API Спецификация Smart Speaker
+# API Спецификация «Камыш» (Kamish)
 
-Данный документ содержит полную спецификацию REST и WebSocket интерфейсов умной колонки Smart Speaker.
+Данный документ содержит полную спецификацию REST и WebSocket интерфейсов умной колонки «Камыш» (Kamish).
 
 - **Базовый URL API**: `http://localhost:8080/api/v1`
 - **Формат данных**: `application/json` (кодировка UTF-8)
-- **Аутентификация**: Локальная сеть (внутренний защищенный периметр), для внешних подключений защищается через VPN/Reverse Proxy.
+- **Аутентификация**: Сессионная аутентификация на базе Argon2id. Все маршруты `/api/v1/*` защищены `auth_middleware` (токен передаётся через Cookie `kamish_session=<token>` или заголовок `Authorization: Bearer <token>`). Публичные маршруты: `GET /api/v1/status` и `POST /api/v1/auth/login`. Если дефолтный пароль не был изменён (`must_change_password: true`), возвращается код `403 Forbidden` с ошибкой `PASSWORD_CHANGE_REQUIRED`.
 - **Обработка ошибок**: Все ошибки возвращаются в формате JSON:
   ```json
   {
@@ -18,22 +18,33 @@
 ## Содержание
 
 1. [Общие соглашения и коды ответов](#общие-соглашения-и-коды-ответов)
-2. [Системный статус и диагностика](#1-системный-статус-и-диагностика)
+2. [Аутентификация и сессии (Auth)](#1-аутентификация-и-сессии-auth)
+   - [POST /api/v1/auth/login](#post-apiv1authlogin)
+   - [POST /api/v1/auth/change-password](#post-apiv1authchange-password)
+   - [GET /api/v1/auth/session](#get-apiv1authsession)
+   - [POST /api/v1/auth/logout](#post-apiv1authlogout)
+3. [Мастер первоначальной настройки (Setup Wizard)](#2-мастер-первоначальной-настройки-setup-wizard)
+   - [GET /api/v1/setup/status](#get-apiv1setupstatus)
+   - [POST /api/v1/setup/step](#post-apiv1setupstep)
+   - [POST /api/v1/setup/complete](#post-apiv1setupcomplete)
+   - [GET /api/v1/setup/diagnostics](#get-apiv1setupdiagnostics)
+   - [POST /api/v1/setup/simulate-degradation](#post-apiv1setupsimulate-degradation)
+4. [Системный статус и диагностика](#3-системный-статус-и-диагностика)
    - [GET /api/v1/status](#get-apiv1status)
-3. [Будильники (Alarms)](#2-будильники-alarms)
+5. [Будильники (Alarms)](#4-будильники-alarms)
    - [POST /api/v1/alarms](#post-apiv1alarms)
    - [GET /api/v1/alarms](#get-apiv1alarms)
    - [DELETE /api/v1/alarms/:id](#delete-apiv1alarmsid)
    - [POST /api/v1/alarms/:id/toggle](#post-apiv1alarmsidtoggle)
-4. [Напоминания (Reminders)](#3-напоминания-reminders)
+6. [Напоминания (Reminders)](#5-напоминания-reminders)
    - [POST /api/v1/reminders](#post-apiv1reminders)
    - [GET /api/v1/reminders](#get-apiv1reminders)
    - [DELETE /api/v1/reminders/:id](#delete-apiv1remindersid)
-5. [AI-оркестратор и Tool Registry](#4-ai-оркестратор-и-tool-registry)
+7. [AI-оркестратор и Tool Registry](#6-ai-оркестратор-и-tool-registry)
    - [POST /api/v1/ai/prompt](#post-apiv1aiprompt)
    - [GET /api/v1/ai/tools](#get-apiv1aitools)
    - [GET /api/v1/ai/sessions/:id](#get-apiv1aisessionsid)
-6. [Музыкальный плеер (Music Manager)](#5-музыкальный-плеер-music-manager)
+8. [Музыкальный плеер (Music Manager)](#7-музыкальный-плеер-music-manager)
    - [GET /api/v1/music/search](#get-apiv1musicsearch)
    - [GET /api/v1/music/current](#get-apiv1musiccurrent)
    - [GET /api/v1/music/history](#get-apiv1musichistory)
@@ -46,28 +57,34 @@
    - [POST /api/v1/music/skip](#post-apiv1musicskip)
    - [GET /api/v1/music/recommendations](#get-apiv1musicrecommendations)
    - [GET /api/v1/music/radio](#get-apiv1musicradio)
-7. [Настройки устройства (Settings)](#6-настройки-устройства-settings)
+   - [GET /api/v1/music/lavalink/status](#get-apiv1musiclavalinkstatus)
+   - [POST /api/v1/music/lavalink/config](#post-apiv1musiclavalinkconfig)
+   - [GET /api/v1/music/youtube/auth/status](#get-apiv1musicyoutubeauthstatus)
+   - [POST /api/v1/music/youtube/auth/begin](#post-apiv1musicyoutubeauthbegin)
+   - [POST /api/v1/music/youtube/auth/finish](#post-apiv1musicyoutubeauthfinish)
+   - [POST /api/v1/music/youtube/auth/logout](#post-apiv1musicyoutubeauthlogout)
+9. [Настройки устройства (Settings)](#8-настройки-устройства-settings)
    - [GET /api/v1/settings](#get-apiv1settings)
    - [PUT /api/v1/settings](#put-apiv1settings)
-8. [Bluetooth A2DP Sink (Раздел 10)](#7-bluetooth-a2dp-sink-раздел-10)
-   - [GET /api/v1/bluetooth/status](#get-apiv1bluetoothstatus)
-   - [POST /api/v1/bluetooth/scan](#post-apiv1bluetoothscan)
-   - [POST /api/v1/bluetooth/pair](#post-apiv1bluetoothpair)
-   - [POST /api/v1/bluetooth/connect](#post-apiv1bluetoothconnect)
-   - [POST /api/v1/bluetooth/disconnect](#post-apiv1bluetoothdisconnect)
-9. [Сетевой менеджер и Wi-Fi (Раздел 11)](#8-сетевой-менеджер-и-wi-fi-раздел-11)
-   - [GET /api/v1/network/status](#get-apiv1networkstatus)
-   - [GET /api/v1/network/wifi/scan](#get-apiv1networkwifiscan)
-   - [POST /api/v1/network/wifi/connect](#post-apiv1networkwificonnect)
-   - [POST /api/v1/network/wifi/disconnect](#post-apiv1networkwifidisconnect)
-   - [POST /api/v1/network/ap/start](#post-apiv1networkapstart)
-   - [POST /api/v1/network/ap/stop](#post-apiv1networkapstop)
-10. [VPN / VLESS туннелирование (Раздел 12)](#9-vpn--vless-туннелирование-раздел-12)
+10. [Bluetooth A2DP Sink](#9-bluetooth-a2dp-sink)
+    - [GET /api/v1/bluetooth/status](#get-apiv1bluetoothstatus)
+    - [POST /api/v1/bluetooth/scan](#post-apiv1bluetoothscan)
+    - [POST /api/v1/bluetooth/pair](#post-apiv1bluetoothpair)
+    - [POST /api/v1/bluetooth/connect](#post-apiv1bluetoothconnect)
+    - [POST /api/v1/bluetooth/disconnect](#post-apiv1bluetoothdisconnect)
+11. [Сетевой менеджер и Wi-Fi](#10-сетевой-менеджер-и-wi-fi)
+    - [GET /api/v1/network/status](#get-apiv1networkstatus)
+    - [GET /api/v1/network/wifi/scan](#get-apiv1networkwifiscan)
+    - [POST /api/v1/network/wifi/connect](#post-apiv1networkwificonnect)
+    - [POST /api/v1/network/wifi/disconnect](#post-apiv1networkwifidisconnect)
+    - [POST /api/v1/network/ap/start](#post-apiv1networkapstart)
+    - [POST /api/v1/network/ap/stop](#post-apiv1networkapstop)
+12. [VPN / VLESS туннелирование](#11-vpn--vless-туннелирование)
     - [GET /api/v1/vpn/status](#get-apiv1vpnstatus)
     - [POST /api/v1/vpn/connect](#post-apiv1vpnconnect)
     - [POST /api/v1/vpn/disconnect](#post-apiv1vpndisconnect)
     - [POST /api/v1/vpn/config](#post-apiv1vpnconfig)
-11. [WebSocket Real-Time Events (Раздел 16)](#10-websocket-real-time-events-раздел-16)
+13. [WebSocket Real-Time Events](#12-websocket-real-time-events)
     - [WS /api/v1/events](#ws-apiv1events)
 
 ---
@@ -79,6 +96,8 @@
 | `200 OK` | Успешно | Запрос выполнен успешно, тело ответа содержит запрошенные данные или подтверждение действия. |
 | `201 Created` | Создано | Ресурс (будильник, напоминание) успешно создан. |
 | `400 Bad Request` | Неверный запрос | Ошибка валидации входных параметров (неверный формат времени, недопустимое значение). |
+| `401 Unauthorized` | Не авторизован | Отсутствует, поврежден или просрочен токен сессии (`Missing session token`). |
+| `403 Forbidden` | Запрещено | Требуется обязательная смена дефолтного пароля администратора (`PASSWORD_CHANGE_REQUIRED`). |
 | `404 Not Found` | Не найдено | Запрашиваемый ресурс (ID будильника, сессии) не существует или эндпоинт отсутствует. |
 | `500 Internal Error` | Ошибка сервера | Необработанная ошибка базы данных, файловой системы или системного вызова. |
 
@@ -92,11 +111,327 @@
 
 ---
 
-## 1. Системный статус и диагностика
+## 1. Аутентификация и сессии (Auth)
+
+Подсистема аутентификации использует стойкое хэширование паролей Argon2id и управляет жизненным циклом сессий пользователей в таблицах `users` и `auth_sessions`.
+Маршруты защищены `auth_middleware`. Если у пользователя активен флаг `must_change_password`, вызовы защищённых эндпоинтов блокируются ошибкой 403 `PASSWORD_CHANGE_REQUIRED` до момента смены пароля.
+
+### `POST /api/v1/auth/login`
+
+Аутентификация пользователя по логину и паролю. При успехе возвращает токен сессии и выставляет HTTP-Only Cookie `kamish_session`.
+
+#### Заголовки
+- `Content-Type: application/json`
+- `Accept: application/json`
+
+#### Тело запроса
+```json
+{
+  "username": "admin",
+  "password": "admin"
+}
+```
+
+#### Пример ответа (`200 OK`)
+Заголовки ответа включают `Set-Cookie: kamish_session=<token>; Path=/; HttpOnly; SameSite=Lax; Max-Age=604800`.
+```json
+{
+  "token": "4f5e8a71-6b2c-49a3-8d01-e97c413b52f1",
+  "user": {
+    "id": "1",
+    "username": "admin",
+    "must_change_password": true
+  },
+  "expires_at": "2026-11-11T12:00:00Z"
+}
+```
+
+#### Ошибки
+- `401 Unauthorized` (`INVALID_CREDENTIALS`): Неверное имя пользователя или пароль.
+
+---
+
+### `POST /api/v1/auth/change-password`
+
+Смена пароля текущего пользователя. Снимает требование `must_change_password`, отзывает все предыдущие сессии пользователя и обновляет статус этапа `auth` в мастере первоначальной настройки.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+- `Content-Type: application/json`
+
+#### Тело запроса
+```json
+{
+  "old_password": "admin",
+  "new_password": "NewSecurePassword123!"
+}
+```
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "status": "ok",
+  "message": "Password changed successfully",
+  "must_change_password": false
+}
+```
+
+#### Ошибки
+- `400 Bad Request` (`PASSWORD_POLICY_VIOLATION`): Пароль не удовлетворяет требованиям сложности.
+- `401 Unauthorized` (`UNAUTHORIZED`): Неверный текущий пароль или отсутствует сессия.
+
+---
+
+### `GET /api/v1/auth/session`
+
+Проверка валидности текущей сессии и получение данных профиля пользователя.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "authenticated": true,
+  "user": {
+    "id": "1",
+    "username": "admin",
+    "must_change_password": false
+  },
+  "expires_at": "2026-11-11T12:00:00Z"
+}
+```
+
+---
+
+### `POST /api/v1/auth/logout`
+
+Завершение сессии. Удаляет запись сессии из базы данных и очищает Cookie `kamish_session`.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "status": "ok",
+  "message": "Logged out successfully"
+}
+```
+
+---
+
+## 2. Мастер первоначальной настройки (Setup Wizard)
+
+Мастер первоначальной настройки координирует пошаговый ввод устройства в эксплуатацию по обязательным этапам: `network` (подключение Wi-Fi), `audio` (калибровка громкости с Safe Ceiling $\le 85\%$), `voice` (проверка микрофона и локального STT/TTS) и `ai` (проверка готовности Antigravity CLI). Прогресс сохраняется в таблице `device_state`.
+
+### `GET /api/v1/setup/status`
+
+Возвращает текущий прогресс настройки, статус завершенности, состояние обязательных этапов и список деградированных компонентов.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "is_completed": false,
+  "current_step": "network",
+  "completed_at": null,
+  "steps": [
+    {
+      "id": "network",
+      "title": "Сетевое подключение",
+      "status": "completed",
+      "is_mandatory": true,
+      "health": {
+        "healthy": true,
+        "message": "Подключено к Wi-Fi"
+      },
+      "data": {
+        "ssid": "HomeNetwork_5G"
+      },
+      "updated_at": "2026-11-04T10:15:00Z"
+    },
+    {
+      "id": "audio",
+      "title": "Аудиосистема",
+      "status": "in_progress",
+      "is_mandatory": true,
+      "health": {
+        "healthy": true,
+        "message": "Акустика готова, лимитер 85%"
+      },
+      "data": {
+        "volume": 60,
+        "safe_ceiling": 85
+      },
+      "updated_at": null
+    },
+    {
+      "id": "voice",
+      "title": "Голосовой конвейер",
+      "status": "pending",
+      "is_mandatory": true,
+      "health": {
+        "healthy": true,
+        "message": "Vosk STT и Piper TTS обнаружены"
+      },
+      "data": null,
+      "updated_at": null
+    },
+    {
+      "id": "ai",
+      "title": "Интеграция с ИИ",
+      "status": "pending",
+      "is_mandatory": true,
+      "health": {
+        "healthy": true,
+        "message": "Antigravity CLI готов"
+      },
+      "data": null,
+      "updated_at": null
+    }
+  ],
+  "degraded_components": []
+}
+```
+
+---
+
+### `POST /api/v1/setup/step`
+
+Сохранение параметров и статуса прохождения этапа мастера настройки. При обновлении шага `audio` автоматически применяется лимитер громкости (Safe Volume Ceiling $\le 85\%$). При успехе эмитит событие WebSocket `setup_step_updated`.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+- `Content-Type: application/json`
+
+#### Тело запроса
+```json
+{
+  "step": "audio",
+  "status": "completed",
+  "data": {
+    "volume": 70,
+    "safe_ceiling": 85
+  }
+}
+```
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "success": true,
+  "step": "audio",
+  "status": "completed",
+  "next_step": "voice",
+  "is_completed": false,
+  "updated_at": "2026-11-04T10:20:00Z"
+}
+```
+
+---
+
+### `POST /api/v1/setup/complete`
+
+Финализация мастера настройки. Проверяет завершенность всех обязательных этапов (`network`, `audio`, `voice`, `ai`), фиксирует `is_completed: true` в `device_state` и эмитит событие WebSocket `setup_completed`.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "success": true,
+  "is_completed": true,
+  "completed_at": "2026-11-04T10:25:00Z",
+  "message": "Setup wizard successfully completed. Device is ready for normal operation."
+}
+```
+
+#### Ошибки
+- `400 Bad Request` (`VALIDATION_ERROR`): Не все обязательные этапы завершены (например, `Cannot complete setup: stages [voice, ai] are not completed`).
+
+---
+
+### `GET /api/v1/setup/diagnostics`
+
+Глубокая диагностика всех подсистем устройства для экрана восстановления после сбоев.
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "healthy": true,
+  "timestamp": "2026-11-04T10:30:00Z",
+  "steps": [],
+  "degraded_components": [],
+  "subsystems": {
+    "network": {
+      "interface": "wlan0",
+      "ip": "192.168.1.120",
+      "wifi_connected": true,
+      "ethernet_connected": false,
+      "ap_active": false
+    },
+    "audio": {
+      "output_device": "GT-112 Line Out",
+      "safe_ceiling": 85,
+      "volume": 60,
+      "mixer_status": "active"
+    },
+    "voice": {
+      "microphone_available": true,
+      "active_stt": "vosk",
+      "active_tts": "piper"
+    },
+    "ai": {
+      "ready": true,
+      "mode": "cli",
+      "version": "1.2.0"
+    }
+  }
+}
+```
+
+---
+
+### `POST /api/v1/setup/simulate-degradation`
+
+Тестовая эмуляция сбоя подсистемы (для проверки UI и механизмов аварийного восстановления).
+
+#### Заголовки
+- `Authorization: Bearer <token>` или Cookie `kamish_session=<token>`
+- `Content-Type: application/json`
+
+#### Тело запроса
+```json
+{
+  "component": "voice",
+  "degraded": true,
+  "error_reason": "Microphone array disconnected"
+}
+```
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "status": "ok",
+  "component": "voice",
+  "degraded": true
+}
+```
+
+---
+
+## 3. Системный статус и диагностика
 
 ### `GET /api/v1/status`
 
-Возвращает комплексную диагностическую информацию об узле, системных ресурсах Orange Pi Zero 3, подключении к базе данных SQLite, состоянии подсистем и шедулера.
+Возвращает комплексную диагностическую информацию об узле, системных ресурсах устройства, подключении к базе данных SQLite, состоянии подсистем и шедулера.
 
 #### Заголовки
 - `Accept: application/json`
@@ -111,7 +446,7 @@
   "version": "0.1.0",
   "app_uptime_secs": 3612,
   "device": {
-    "hostname": "orangepizero3",
+    "hostname": "kamish",
     "os_name": "Linux",
     "os_version": "Debian GNU/Linux 12 (bookworm)",
     "kernel_version": "6.1.31-sun50iw9",
@@ -1279,7 +1614,7 @@ curl -s -X POST http://localhost:8080/api/v1/music/skip \
 
 ### `GET /api/v1/music/recommendations`
 
-Возвращает персональные рекомендации треков, сформированные на основе лайков, полноты прослушивания и минимизации скипов.
+Возвращает персональные рекомендации треков, сформированные исключительно на стороне сервиса YouTube Music.
 
 #### Заголовки
 - `Accept: application/json`
@@ -1380,13 +1715,197 @@ curl -s -X GET http://localhost:8080/api/v1/music/radio
 
 ---
 
+### `GET /api/v1/music/lavalink/status`
+
+Возвращает статус подключения к аудиосерверу Lavalink v4, активные источники (YouTube, Yandex Music, SoundCloud) и плагины.
+
+#### Заголовки
+- `Accept: application/json`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "connected": true,
+  "host": "127.0.0.1",
+  "port": 2333,
+  "version": "4.0.8",
+  "sources": [
+    "youtube",
+    "yandexmusic",
+    "soundcloud"
+  ],
+  "plugins": [
+    "youtube-plugin",
+    "lavasrc-plugin"
+  ],
+  "yandex_music_configured": true
+}
+```
+
+#### Пример cURL
+```bash
+curl -s -X GET http://localhost:8080/api/v1/music/lavalink/status
+```
+
+---
+
+### `POST /api/v1/music/lavalink/config`
+
+Обновляет параметры подключения к Lavalink и сохраняет OAuth-токен аккаунта Яндекс Музыки в `device_state`.
+
+#### Заголовки
+- `Content-Type: application/json`
+- `Accept: application/json`
+
+#### Тело запроса
+```json
+{
+  "host": "127.0.0.1",
+  "port": 2333,
+  "password": "youshallnotpass",
+  "yandex_music_token": "y0_AgAAAA..."
+}
+```
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "status": "ok",
+  "lavalink": {
+    "connected": true,
+    "host": "127.0.0.1",
+    "port": 2333,
+    "version": "4.0.8",
+    "sources": [
+      "youtube",
+      "yandexmusic",
+      "soundcloud"
+    ],
+    "plugins": [
+      "youtube-plugin",
+      "lavasrc-plugin"
+    ],
+    "yandex_music_configured": true
+  }
+}
+```
+
+#### Пример cURL
+```bash
+curl -s -X POST http://localhost:8080/api/v1/music/lavalink/config \
+  -H "Content-Type: application/json" \
+  -d '{"yandex_music_token":"y0_AgAAAA..."}'
+```
+
+---
+
+### `GET /api/v1/music/youtube/auth/status`
+
+Возвращает текущий статус авторизации в Google / YouTube, валидность токена и наличие файла `cookies.txt`.
+
+#### Заголовки
+- `Accept: application/json`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "authorized": true,
+  "has_client": true,
+  "access_token_valid": true,
+  "expires_in": 3540,
+  "token_path": "/var/lib/kamish/youtube-oauth.json",
+  "cookies_path": "/var/lib/kamish/youtube-cookies.txt",
+  "cookies_ready": true,
+  "problem": null
+}
+```
+
+---
+
+### `POST /api/v1/music/youtube/auth/begin`
+
+Запускает процесс OAuth 2.0 Device Flow, возвращая URL подтверждения и разовый код для пользователя.
+
+#### Заголовки
+- `Content-Type: application/json`
+- `Accept: application/json`
+
+#### Тело запроса
+```json
+{
+  "client_id": "123456789-abc.apps.googleusercontent.com",
+  "client_secret": "GOCSPX-..."
+}
+```
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "verification_url": "https://www.google.com/device",
+  "user_code": "ABCD-EFGH",
+  "expires_in": 1800,
+  "interval": 5,
+  "device_code": "AH-..."
+}
+```
+
+---
+
+### `POST /api/v1/music/youtube/auth/finish`
+
+Завершает авторизацию после подтверждения пользователем в браузере. Обменивает `device_code` на токены и автоматически генерирует Netscape `cookies.txt` на сервере.
+
+#### Заголовки
+- `Content-Type: application/json`
+- `Accept: application/json`
+
+#### Тело запроса
+```json
+{
+  "device_code": "AH-..."
+}
+```
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "authorized": true,
+  "has_client": true,
+  "access_token_valid": true,
+  "expires_in": 3600,
+  "token_path": "/var/lib/kamish/youtube-oauth.json",
+  "cookies_path": "/var/lib/kamish/youtube-cookies.txt",
+  "cookies_ready": true,
+  "problem": null
+}
+```
+
+---
+
+### `POST /api/v1/music/youtube/auth/logout`
+
+Удаляет сохранённые токены и сгенерированный файл `cookies.txt` с сервера.
+
+#### Заголовки
+- `Accept: application/json`
+
+#### Пример ответа (`200 OK`)
+```json
+{
+  "status": "ok",
+  "message": "YouTube credentials cleared"
+}
+```
+
+---
+
 ## 6. Менеджер речи (Speech Manager: STT, TTS, Wake Word, VAD)
 
 Модуль распознавания речи (STT), синтеза (TTS), обнаружения активности голоса (VAD) и детекции активационной фразы (Wake Word).
 
 ### `GET /api/v1/speech/status`
 
-Возвращает текущее состояние подсистемы речи (активные провайдеры, голос, VAD, Wake Word, состояние микрофона).
+Возвращает текущее состояние подсистемы речи (активные локальные провайдеры, голос, VAD, Wake Word, состояние микрофона). Распознавание (STT) и синтез (TTS) выполняются строго офлайн.
 
 #### Заголовки
 - `Accept: application/json`
@@ -1395,9 +1914,9 @@ curl -s -X GET http://localhost:8080/api/v1/music/radio
 ```json
 {
   "microphone_connected": true,
-  "active_stt_provider": "cloud_free",
-  "active_tts_provider": "cloud_free",
-  "active_voice": "ru-RU-Standard-A",
+  "active_stt_provider": "vosk",
+  "active_tts_provider": "piper",
+  "active_voice": "ru_RU-dmitri-medium",
   "vad_enabled": true,
   "wakeword_enabled": true,
   "supported_keywords": ["ассистент", "колонка", "слушай"]
@@ -1413,7 +1932,7 @@ curl -s http://localhost:8080/api/v1/speech/status
 
 ### `GET /api/v1/speech/voices`
 
-Возвращает каталог всех доступных голосов синтеза речи (TTS) от локальных и облачных провайдеров.
+Возвращает каталог всех доступных локальных голосов синтеза речи (TTS). Облачные провайдеры речи не поддерживаются согласно требованиям приватности.
 
 #### Заголовки
 - `Accept: application/json`
@@ -1421,15 +1940,8 @@ curl -s http://localhost:8080/api/v1/speech/status
 #### Пример ответа (`200 OK`)
 ```json
 {
-  "count": 4,
+  "count": 3,
   "voices": [
-    {
-      "id": "ru-RU-Standard-A",
-      "name": "Русский (Google Cloud Free)",
-      "language": "ru-RU",
-      "gender": "Female",
-      "provider": "cloud_free"
-    },
     {
       "id": "ru_RU-dmitri-medium",
       "name": "Дмитрий (Piper Neural)",
@@ -1472,9 +1984,9 @@ curl -s http://localhost:8080/api/v1/speech/voices
 #### Пример тела запроса
 ```json
 {
-  "tts_provider": "offline_fallback",
-  "stt_provider": "mock",
-  "voice": "offline-sine-tone",
+  "tts_provider": "piper",
+  "stt_provider": "vosk",
+  "voice": "ru_RU-dmitri-medium",
   "vad_enabled": true,
   "wakeword_enabled": true
 }
@@ -1485,9 +1997,9 @@ curl -s http://localhost:8080/api/v1/speech/voices
 {
   "updated": true,
   "status": {
-    "active_stt_provider": "mock",
-    "active_tts_provider": "offline_fallback",
-    "active_voice": "offline-sine-tone",
+    "active_stt_provider": "vosk",
+    "active_tts_provider": "piper",
+    "active_voice": "ru_RU-dmitri-medium",
     "vad_enabled": true,
     "wakeword_enabled": true
   }
@@ -1498,14 +2010,14 @@ curl -s http://localhost:8080/api/v1/speech/voices
 ```bash
 curl -s -X POST http://localhost:8080/api/v1/speech/config \
   -H "Content-Type: application/json" \
-  -d '{"tts_provider":"cloud_free","voice":"ru-RU-Standard-A"}'
+  -d '{"tts_provider":"piper","voice":"ru_RU-dmitri-medium"}'
 ```
 
 ---
 
 ### `POST /api/v1/speech/synthesize` (алиас: `/api/v1/speech/tts`)
 
-Синтезирует переданный текст в аудиопоток WAV/MP3 или напрямую воспроизводит через динамик умной колонки.
+Синтезирует переданный текст в аудиопоток WAV через локальный движок или напрямую воспроизводит через динамик умной колонки.
 
 #### Заголовки
 - `Content-Type: application/json`
@@ -1515,7 +2027,7 @@ curl -s -X POST http://localhost:8080/api/v1/speech/config \
 |---|---|---|---|
 | `text` | string | Да | Текст для озвучивания |
 | `voice` | string | Нет | ID голоса |
-| `provider` | string | Нет | Провайдер: `cloud_free`, `piper`, `rhvoice`, `offline_fallback` |
+| `provider` | string | Нет | Локальный провайдер: `piper`, `rhvoice`, `offline_fallback` |
 | `speed` | number | Нет | Скорость воспроизведения (0.5 – 2.0, по умолчанию 1.0) |
 | `play_on_speaker` | boolean | Нет | Если `true`, звук воспроизводится на физическом динамике колонки |
 | `format` | string | Нет | `"binary"` (по умолчанию отдаёт аудио-бинарник) или `"json"` (base64) |
@@ -1539,7 +2051,7 @@ curl -s -X POST http://localhost:8080/api/v1/speech/synthesize \
 
 ### `POST /api/v1/speech/recognize` (алиас: `/api/v1/speech/stt`)
 
-Распознаёт аудиоданные (PCM/WAV) в текст через выбранный STT-провайдер с опциональной сквозной диспетчеризацией в AI Orchestrator.
+Распознаёт аудиоданные (PCM/WAV) в текст через локальный STT-провайдер с опциональной сквозной диспетчеризацией в AI Orchestrator.
 
 #### Заголовки
 - `Content-Type: application/json`
@@ -1549,7 +2061,7 @@ curl -s -X POST http://localhost:8080/api/v1/speech/synthesize \
 |---|---|---|---|
 | `audio_base64` | string | Да | Аудиопоток в кодировке base64 (WAV или сырой PCM 16-bit 16kHz) |
 | `language` | string | Нет | Язык (`"ru"`, по умолчанию `"ru"`) |
-| `provider` | string | Нет | STT-провайдер (`"vosk"`, `"sherpa_onnx"`, `"cloud_free"`, `"mock"`) |
+| `provider` | string | Нет | Локальный STT-провайдер (`"vosk"`, `"sherpa_onnx"`, `"mock"`) |
 | `dispatch_ai` | boolean | Нет | Если `true`, распознанная команда сразу отправляется в AI Orchestrator, и возвращается ответ ассистента |
 
 #### Пример ответа (`200 OK`)
@@ -1741,7 +2253,7 @@ curl -s -X POST http://localhost:8080/api/v1/speech/capture/stop | jq .
 #### Пример ответа (`200 OK`)
 ```json
 {
-  "device_name": "Smart Speaker GT-112",
+  "device_name": "kamish",
   "volume_default": 60,
   "timezone": "Europe/Moscow",
   "tts_engine": "piper",
@@ -1811,7 +2323,7 @@ curl -s -X PUT http://localhost:8080/api/v1/settings \
 
 ## 7. Bluetooth A2DP Sink (Раздел 10)
 
-Управление Bluetooth-контроллером Allwinner H618 / BlueZ для работы колонки в режиме беспроводного аудиоприемника (A2DP Sink) со смартфонов и ПК.
+Управление Bluetooth-контроллером BlueZ для работы колонки в режиме беспроводного аудиоприемника (A2DP Sink) со смартфонов и ПК.
 
 ### `GET /api/v1/bluetooth/status`
 
@@ -2020,7 +2532,7 @@ curl -s -X POST http://localhost:8080/api/v1/bluetooth/disconnect
   },
   "ap_mode": {
     "active": false,
-    "ssid": "SmartSpeaker-Setup"
+    "ssid": "kamish-setup"
   }
 }
 ```
@@ -2157,7 +2669,7 @@ curl -s -X POST http://localhost:8080/api/v1/network/wifi/disconnect
 
 ### `POST /api/v1/network/ap/start`
 
-Принудительно поднимает аварийную точку доступа (Setup AP: `SmartSpeaker-Setup`, IP `192.168.4.1`) для начальной настройки устройства или восстановления связи.
+Принудительно поднимает аварийную точку доступа (Setup AP: `kamish-setup`, IP `192.168.4.1`) для начальной настройки устройства или восстановления связи.
 
 #### Заголовки
 - `Accept: application/json`
@@ -2166,7 +2678,7 @@ curl -s -X POST http://localhost:8080/api/v1/network/wifi/disconnect
 ```json
 {
   "status": "ap_started",
-  "ssid": "SmartSpeaker-Setup",
+  "ssid": "kamish-setup",
   "gateway_ip": "192.168.4.1"
 }
 ```
@@ -2433,7 +2945,7 @@ curl -s -X POST http://localhost:8080/api/v1/vpn/config \
 const socket = new WebSocket('ws://' + window.location.host + '/api/v1/events');
 
 socket.onopen = () => {
-  console.log('Подключено к WebSocket событиям Smart Speaker');
+  console.log('Подключено к WebSocket событиям Kamish');
 };
 
 socket.onmessage = (event) => {

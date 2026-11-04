@@ -1,6 +1,6 @@
-# Smart Speaker (Автономная умная колонка)
+# Kamish OS (Автономная умная колонка «Камыш»)
 
-Автономная умная колонка на базе микрокомпьютера **Orange Pi Zero 3 (Allwinner H618, 4 GB RAM, ARM64)**, микрофонного массива **Seeed ReSpeaker XVF3800** и акустической системы **GT-112**, работающая под управлением **Armbian Linux (Debian Bookworm ARM64 Minimal)**.
+Автономная умная колонка на базе микрокомпьютера архитектуры **ARM64 (4 GB RAM)**, микрофонного массива **Seeed ReSpeaker XVF3800** и акустической системы **GT-112**, работающая под управлением **Kamish Linux (собственной встроенной ОС на базе Buildroot ARM64)**.
 
 Проект спроектирован по принципу **Offline-First**: все базовые функции (будильники, напоминания, воспроизведение локальной музыки, индикация статуса, синтез системных оповещений) полностью функциональны без доступа к интернету и облачному ИИ.
 
@@ -19,21 +19,21 @@
    - Строго типизированный реестр из **14 инструментов** (`create_alarm`, `delete_alarm`, `list_alarms`, `snooze_alarm`, `create_reminder`, `list_reminders`, `set_volume`, `play_music`, `pause_music`, `resume_music`, `stop_music`, `search_music`, `get_current_track`, `get_device_status`).
    - Прозрачный возврат ошибок инструментов пользователю без фальсификации успеха.
 3. **Мультимедийный плеер (Этап 5)**:
-   - Headless управление **MPV** через IPC UNIX-сокет (`/tmp/mpv-smart-speaker.sock`) с виртуальным mock-фолбэком.
+   - Headless управление **MPV** через IPC UNIX-сокет (`/tmp/mpv-kamish.sock`) с виртуальным mock-фолбэком.
    - Потоковое воспроизведение из YouTube Music (`yt-dlp`), интернет-радиостанций и локальных файлов.
-   - Алгоритм локальных рекомендаций на основе лайков, истории прослушиваний и штрафов за пропуск.
+   - Получение музыкальных рекомендаций исключительно на стороне YouTube Music (без локального скоринга).
 4. **Bluetooth A2DP Sink (Этап 7)**:
    - Превращение колонки в беспроводную акустику для смартфонов и ПК через BlueZ / BlueALSA.
    - Управление сопряжением (Pair), подключением (Connect) и режимом видимости (Discoverable).
 5. **Сетевой стек и Setup AP (Этап 7)**:
    - NetworkManager (`nmcli`): автоматическое сканирование сетей Wi-Fi, безопасное подключение и переключение.
-   - Режим первичной настройки **SmartSpeaker-Setup AP** (192.168.4.1) для первоначального конфигурирования без экрана.
-   - Доступ по mDNS адресу: `http://<hostname>.local:8080`.
+   - Режим первичной настройки **kamish-setup AP** (192.168.4.1) для первоначального конфигурирования без экрана.
+   - Доступ по mDNS адресу: `http://kamish.local:8080`.
 6. **Безопасный туннель VLESS / Reality (Этап 7)**:
    - Интеграция клиента Happ/VLESS для обхода региональных блокировок музыкальных сервисов.
    - Строгая маскировка секретов: пароли Wi-Fi, ключи VPN и токены никогда не попадают в логи и API.
 7. **Аппаратная телеметрия и защита акустики (Этап 8)**:
-   - Мониторинг температуры Allwinner H618 (`/sys/class/thermal/thermal_zone0/temp`), частоты ядер и троттлинга ($\ge 80^\circ\text{C}$).
+   - Мониторинг температуры процессора (`/sys/class/thermal/thermal_zone0/temp`), частоты ядер и троттлинга ($\ge 80^\circ\text{C}$).
    - Программный лимитер максимальной громкости (**Safe Volume Ceiling = 85%**) для защиты динамиков GT-112 от клиппинга и перегрева.
    - Селектор аудиомаршрутов (GT-112 ALSA Line Out, Bluetooth Sink, Headphones 3.5mm, System Sink).
 8. **Веб-панель управления (Этап 3)**:
@@ -46,7 +46,7 @@
 ## 🏗 Архитектура репозитория
 
 ```
-radiant-bardeen/
+kamish-os/
 ├── backend/                  # Rust бэкенд (модульный монолит)
 │   ├── Cargo.toml
 │   ├── src/
@@ -63,7 +63,7 @@ radiant-bardeen/
 │   │   ├── network/          # Wi-Fi сканер, подключение, Setup AP
 │   │   ├── scheduler/        # Планировщик будильников/напоминаний, chrono-tz
 │   │   ├── speech/           # VAD, WakeWord, STT, TTS, offline synthesizer
-│   │   ├── system/           # Аппаратная телеметрия, сенсоры H618, ReSpeaker
+│   │   ├── system/           # Аппаратная телеметрия, сенсоры процессора, ReSpeaker
 │   │   └── vpn/              # VLESS Reality менеджер с маскированием
 │   └── tests/                # 10 файлов интеграционных тестов (70 тестов)
 ├── frontend/                 # Клиентская веб-панель
@@ -74,17 +74,18 @@ radiant-bardeen/
 │   │   ├── pages/            # Dashboard, Music, Alarms, Diagnostics, Settings
 │   │   └── types/            # TypeScript контракты моделей данных
 │   └── dist/                 # Скомпилированный статический бандл
-├── database/                 # SQLite миграции
-│   └── migrations/
-│       └── 0001_initial_schema.sql
-├── deploy/                   # Файлы развёртывания на железо
-│   ├── armbian/
-│   │   └── install.sh        # Скрипт автоматической установки на Orange Pi Zero 3
+├── database/                 # База данных SQLite
+│   └── schema.sql            # Единая схема БД (таблицы, индексы, PRAGMA user_version)
+├── deploy/                   # Диагностические скрипты и правила устройств
 │   ├── scripts/
 │   │   └── hardware_check.sh # Автономная диагностика периферии и звука
 │   └── systemd/
-│       ├── smart-speaker.service  # Изолированный systemd unit
-│       └── 99-respeaker.rules      # Правила udev для Seeed ReSpeaker XVF3800
+│       ├── kamish.service    # Изолированный systemd unit
+│       └── 99-respeaker.rules# Правила udev для Seeed ReSpeaker XVF3800
+├── firmware/                 # Сборка прошивки Kamish Linux (Buildroot) и OTA-пакетов
+│   ├── buildroot-external-kamish/ # Внешнее дерево пакетов и настроек Buildroot
+│   ├── scripts/              # Скрипты сборки образа (build-firmware.sh) и генерации ключей
+│   └── Dockerfile            # Воспроизводимое окружение сборки прошивки
 ├── docs/                     # Документация
 │   ├── API.md                # Полная спецификация всех 35+ REST и WS эндпоинтов
 │   ├── ARCHITECTURE.md       # Подробная архитектура подсистем
@@ -127,24 +128,37 @@ cd backend
 cargo run
 ```
 Сервис запустится по адресу `http://0.0.0.0:8080`.
-Откройте браузер по адресу `http://localhost:8080/` (или `http://<hostname>.local:8080`).
+Откройте браузер по адресу `http://localhost:8080/` (или `http://kamish.local:8080`).
 
 ---
 
-## 📦 Развёртывание на Orange Pi Zero 3 (ARM64)
+## 📦 Развёртывание на целевом устройстве (ARM64)
 
-1. Установите **Armbian Debian Bookworm Minimal** на microSD карту.
-2. Подключите Seeed ReSpeaker XVF3800 к USB-порту и акустику GT-112 к аналоговому аудиовыходу (разъём 3.5мм или линейные пины).
-3. Скопируйте репозиторий на плату и запустите скрипт автоматической установки:
+Kamish OS работает под управлением специализированного легковесного образа **Kamish Linux**, собираемого с помощью **Buildroot**:
+
+1. **Сборка прошивки и OTA-бандла**:
+   Сборка выполняется в изолированном Docker-контейнере или хост-системе:
    ```bash
-   sudo ./deploy/armbian/install.sh
+   cd firmware
+   ./scripts/build-firmware.sh
    ```
-4. Скрипт:
-   - Установит системные пакеты (`mpv`, `yt-dlp`, `bluez`, `network-manager`, `libasound2`).
-   - Настроит правила `udev` для питания ReSpeaker XVF3800.
-   - Скомпилирует и установит бинарник `/usr/local/bin/smart-speaker`.
-   - Запустит и включит автозагрузку службы `smart-speaker.service`.
-5. Проверьте диагностику железа:
+   Готовый образ `sdcard.img` и OTA-пакеты будут сформированы в `firmware/output/images/`.
+
+2. **Запись образа**:
+   Запишите скомпилированный образ `sdcard.img` на накопитель (microSD / eMMC) с помощью `dd` или BalenaEtcher:
+   ```bash
+   sudo dd if=firmware/output/images/sdcard.img of=/dev/sdX bs=4M status=progress conv=fsync
+   ```
+
+3. **Подключение периферии**:
+   - Подключите Seeed ReSpeaker XVF3800 к USB-порту.
+   - Подключите акустику GT-112 к аналоговому аудиовыходу (разъём 3.5мм или линейные пины).
+   - Вставьте карту памяти и подайте питание (рекомендуется БП 5V / 3A).
+
+4. **Первичная настройка (Setup AP)**:
+   При первом старте колонка поднимает точку доступа Wi-Fi `kamish-setup` (192.168.4.1:8080). Перейдите в браузере по адресу `http://192.168.4.1:8080` и завершите мастер настройки.
+
+5. **Проверка железа**:
    ```bash
    ./deploy/scripts/hardware_check.sh
    # С воспроизведением тестового звукового тона:
@@ -186,4 +200,5 @@ cargo run
 | [`docs/API.md`](docs/API.md) | Полная спецификация REST и WebSocket API с примерами |
 | [`docs/HARDWARE.md`](docs/HARDWARE.md) | Схемотехника, распиновка пинов, питание и акустика GT-112 |
 | [`docs/SECURITY.md`](docs/SECURITY.md) | Модель угроз, политика изоляции AI и маскирование секретов |
+| [`docs/CODE_TASKS.md`](docs/CODE_TASKS.md) | Очередь задач по модификации кодовой базы (бэкенд, фронтенд, скрипты) |
 
