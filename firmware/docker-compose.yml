@@ -1,0 +1,16 @@
+services:
+  builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - ..:/workspace:ro
+      - ./buildroot-external-kamish:/build/external:ro
+      - ./output:/build/buildroot/output
+      - ./dl:/build/buildroot/dl
+    working_dir: /build/buildroot
+    command: >
+      bash -c "
+        make BR2_EXTERNAL=/build/external kamish_orangepi_zero3_defconfig &&
+        make -j$$(nproc)
+      "

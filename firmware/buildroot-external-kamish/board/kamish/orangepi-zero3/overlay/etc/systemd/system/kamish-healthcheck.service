@@ -1,0 +1,14 @@
+[Unit]
+Description=KAMISH OS Boot Healthcheck & RAUC Slot Confirmation
+After=kamish.service network-online.target sound.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/kamish-healthcheck
+RemainAfterExit=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
