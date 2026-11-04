@@ -1,4 +1,5 @@
 use crate::database::DbPool;
+use crate::music::lavalink::LavalinkClient;
 use crate::music::models::{
     HistoryItem, PlaybackState, PlaybackStatus, RadioStation, RecommendationItem, SearchResult,
     Track, TrackInfo,
@@ -19,6 +20,7 @@ pub struct MusicManager {
     queue: RwLock<Vec<Track>>,
     event_bus: std::sync::RwLock<Option<crate::system::EventBus>>,
     ytmusic: YtMusicClient,
+    lavalink: LavalinkClient,
 }
 
 impl Default for MusicManager {
@@ -34,6 +36,7 @@ impl MusicManager {
             queue: RwLock::new(Vec::new()),
             event_bus: std::sync::RwLock::new(None),
             ytmusic: YtMusicClient::default(),
+            lavalink: LavalinkClient::default(),
         }
     }
 
@@ -393,6 +396,11 @@ impl MusicManager {
         &self.ytmusic
     }
 
+    /// Access the Lavalink client
+    pub fn lavalink(&self) -> &LavalinkClient {
+        &self.lavalink
+    }
+
     /// Rate track directly on YouTube Music (LIKE / DISLIKE / INDIFFERENT)
     pub async fn rate_ytmusic(&self, video_id: &str, rating: &str) -> bool {
         self.ytmusic.rate_track(video_id, rating).await
@@ -410,6 +418,20 @@ impl MusicManager {
         {
             if let Ok(vol) = row.0.parse::<u8>() {
                 let _ = self.player.set_volume(vol).await;
+            }
+        }
+
+        if let Ok(Some(row)) = sqlx::query_as::<_, (String,)>(
+            "SELECT value FROM device_state WHERE key = 'yandex_music_token'",
+        )
+        .fetch_optional(pool)
+        .await
+        {
+            let token = row.0.trim().to_string();
+            if !token.is_empty() {
+                let mut cfg = self.lavalink.get_config().await;
+                cfg.yandex_music_token = Some(token);
+                self.lavalink.update_config(cfg).await;
             }
         }
 

@@ -387,3 +387,85 @@ async fn test_music_history_endpoint() {
     let history = hist_json["history"].as_array().unwrap();
     assert!(history.iter().any(|h| h["track_id"] == "hist-track-1"));
 }
+
+#[tokio::test]
+async fn test_lavalink_status_endpoint() {
+    set_audio_muted(true);
+    let app = setup_app().await;
+
+    let res = app
+        .oneshot(
+            Request::builder()
+                .uri("/api/v1/music/lavalink/status")
+                .body(Body::empty())
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+
+    assert!(json.get("connected").is_some());
+    assert_eq!(json["port"], 2333);
+    assert_eq!(json["host"], "127.0.0.1");
+}
+
+#[tokio::test]
+async fn test_lavalink_config_endpoint() {
+    set_audio_muted(true);
+    let app = setup_app().await;
+
+    let payload = json!({
+        "host": "127.0.0.1",
+        "port": 2333,
+        "password": "youshallnotpass",
+        "yandex_music_token": "test_yandex_token_xyz"
+    });
+
+    let res = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/api/v1/music/lavalink/config")
+                .header("Content-Type", "application/json")
+                .body(Body::from(serde_json::to_vec(&payload).unwrap()))
+                .unwrap(),
+        )
+        .await
+        .unwrap();
+
+    assert_eq!(res.status(), StatusCode::OK);
+    let body = res.into_body().collect().await.unwrap().to_bytes();
+    let json: Value = serde_json::from_slice(&body).unwrap();
+
+    assert_eq!(json["status"], "ok");
+    assert_eq!(json["lavalink"]["yandex_music_configured"], true);
+}
+
+#[tokio::test]
+async fn test_music_search_multisource_endpoints() {
+    set_audio_muted(true);
+    let app = setup_app().await;
+
+    for source in ["yandex", "soundcloud", "youtube", "all"] {
+        let res = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/api/v1/music/search?q=rock&source={source}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(res.status(), StatusCode::OK);
+        let body = res.into_body().collect().await.unwrap().to_bytes();
+        let json: Value = serde_json::from_slice(&body).unwrap();
+        assert_eq!(json["source"], source);
+        assert!(json["results"].is_array());
+    }
+}

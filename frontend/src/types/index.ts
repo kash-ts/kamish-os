@@ -392,6 +392,42 @@ export interface HistoryItem {
   completed: boolean;
 }
 
+export interface LavalinkStatus {
+  connected: boolean;
+  host: string;
+  port: number;
+  version?: string;
+  sources: string[];
+  plugins: string[];
+  yandex_music_configured: boolean;
+}
+
+export interface LavalinkConfigRequest {
+  host?: string;
+  port?: number;
+  password?: string;
+  yandex_music_token?: string;
+}
+
+export interface YouTubeAuthStatus {
+  authorized: boolean;
+  has_client: boolean;
+  access_token_valid: boolean;
+  expires_in?: number;
+  token_path: string;
+  cookies_path: string;
+  cookies_ready: boolean;
+  problem?: string;
+}
+
+export interface DeviceCodeChallenge {
+  verification_url: string;
+  user_code: string;
+  expires_in?: number;
+  interval?: number;
+  device_code: string;
+}
+
 // Stage 6 Speech Manager types
 export interface WakeWordEvent {
   keyword: string;

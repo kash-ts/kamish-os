@@ -263,3 +263,73 @@ pub async fn get_radio_handler(State(state): State<AppState>) -> AppResult<impl 
         })),
     ))
 }
+
+#[derive(Debug, Deserialize)]
+pub struct LavalinkConfigRequest {
+    pub host: Option<String>,
+    pub port: Option<u16>,
+    pub password: Option<String>,
+    pub yandex_music_token: Option<String>,
+}
+
+pub async fn lavalink_status_handler(
+    State(state): State<AppState>,
+) -> AppResult<impl IntoResponse> {
+    let status = state.media.lavalink().get_status().await;
+    Ok((StatusCode::OK, Json(status)))
+}
+
+pub async fn lavalink_config_handler(
+    State(state): State<AppState>,
+    Json(payload): Json<LavalinkConfigRequest>,
+) -> AppResult<impl IntoResponse> {
+    let mut cfg = state.media.lavalink().get_config().await;
+
+    if let Some(h) = payload.host {
+        let trimmed = h.trim();
+        if !trimmed.is_empty() {
+            cfg.host = trimmed.to_string();
+        }
+    }
+    if let Some(p) = payload.port {
+        if p > 0 {
+            cfg.port = p;
+        }
+    }
+    if let Some(pw) = payload.password {
+        let trimmed = pw.trim();
+        if !trimmed.is_empty() {
+            cfg.password = trimmed.to_string();
+        }
+    }
+    if let Some(tok) = payload.yandex_music_token {
+        let trimmed = tok.trim();
+        let tok_opt = if trimmed.is_empty() {
+            None
+        } else {
+            Some(trimmed.to_string())
+        };
+        cfg.yandex_music_token = tok_opt.clone();
+
+        // Persist token in device_state
+        let val = tok_opt.unwrap_or_default();
+        let _ = sqlx::query(
+            "INSERT INTO device_state (key, value, updated_at) VALUES ('yandex_music_token', ?, CURRENT_TIMESTAMP)
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at",
+        )
+        .bind(&val)
+        .execute(&state.db)
+        .await;
+    }
+
+    state.media.lavalink().update_config(cfg).await;
+
+    let status = state.media.lavalink().get_status().await;
+    Ok((
+        StatusCode::OK,
+        Json(json!({
+            "status": "ok",
+            "lavalink": status
+        })),
+    ))
+}

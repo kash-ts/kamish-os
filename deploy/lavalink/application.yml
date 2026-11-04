@@ -1,0 +1,82 @@
+server:
+  port: 2333
+  address: 0.0.0.0
+  http2:
+    enabled: true
+
+lavalink:
+  plugins:
+    # 1. YouTube Source Plugin (v4 replacement for built-in youtube)
+    - dependency: "dev.lavalink.youtube:youtube-plugin:1.11.4"
+      snapshot: false
+    # 2. LavaSrc Plugin (Multi-service provider: Yandex Music, Spotify, Apple Music, Deezer)
+    - dependency: "com.github.topi314.lavasrc:lavasrc-plugin:4.3.0"
+      snapshot: false
+
+  server:
+    password: "${LAVALINK_SERVER_PASSWORD:youshallnotpass}"
+    sources:
+      youtube: false # Disabled built-in, delegated to youtube-plugin
+      bandcamp: true
+      soundcloud: true # Native SoundCloud source enabled
+      twitch: false
+      vimeo: false
+      http: true
+      local: false
+    filters:
+      volume: true
+      equalizer: true
+      karaoke: false
+      timescale: false
+      tremolo: false
+      vibrato: false
+      distortion: false
+      rotation: false
+      channelMix: true
+      lowPass: true
+    bufferDurationMs: 400
+    frameBufferDurationMs: 5000
+    opusEncodingQuality: 10
+    resamplingQuality: LOW
+    trackStuckThresholdMs: 10000
+    useSeekGhosting: true
+    playerUpdateInterval: 5
+    youtubePlaylistLoadLimit: 6
+
+plugins:
+  youtube:
+    enabled: true
+    allowSearch: true
+    allowDirectVideoIds: true
+    allowDirectPlaylistIds: true
+    # Resilient clients to avoid Google bot check (403)
+    clients:
+      - "tvhtml5embedded"
+      - "android"
+      - "music"
+      - "web"
+
+  lavasrc:
+    providers:
+      - "ytsearch:\"%ISRC%\""
+      - "ytsearch:%QUERY%"
+    sources:
+      spotify: false
+      applemusic: false
+      deezer: false
+      yandexmusic: true
+      flowerytts: false
+      youtube: false
+    yandexmusic:
+      # Access token from Yandex Music account with active Yandex Plus subscription
+      accessToken: "${YANDEX_MUSIC_TOKEN:}"
+      playlistPageCount: 10
+
+logging:
+  file:
+    path: ./logs/lavalink.log
+  level:
+    root: INFO
+    lavalink: INFO
+    dev.lavalink.youtube: INFO
+    com.github.topi314.lavasrc: INFO

@@ -2,6 +2,7 @@
 //! Handles track search, playback queue, favorites, listening history, skips,
 //! internet radio, local library, headless MPV playback, and custom recommendation engine.
 
+pub mod lavalink;
 pub mod manager;
 pub mod models;
 pub mod player;
@@ -12,6 +13,7 @@ pub mod search;
 pub mod ytmusic;
 pub mod youtube_auth;
 
+pub use lavalink::{LavalinkClient, LavalinkConfig, LavalinkStatus};
 pub use manager::MusicManager;
 pub use models::{
     HistoryItem, PlaybackState, PlaybackStatus, Playlist, QueueItem, RadioStation,

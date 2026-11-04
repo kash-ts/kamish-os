@@ -70,12 +70,20 @@ impl MpvPlayer {
         let _ = tokio::fs::remove_file(&self.ipc_path).await;
 
         let ipc_arg = format!("--input-ipc-server={}", self.ipc_path.to_string_lossy());
-        let spawn_res = Command::new("mpv")
-            .arg("--idle=yes")
+        let mut cmd = Command::new("mpv");
+        cmd.arg("--idle=yes")
             .arg("--no-video")
             .arg(&ipc_arg)
             .arg("--ao=pulse,alsa,null")
-            .arg("--ytdl=yes")
+            .arg("--ytdl=yes");
+
+        let cookies_path = std::env::var("KAMISH_YOUTUBE_COOKIES_PATH")
+            .unwrap_or_else(|_| "/var/lib/kamish/youtube-cookies.txt".to_string());
+        if std::path::Path::new(&cookies_path).exists() {
+            cmd.arg(format!("--ytdl-raw-options=cookies={cookies_path}"));
+        }
+
+        let spawn_res = cmd
             .stdout(std::process::Stdio::null())
             .stderr(std::process::Stdio::null())
             .spawn();
