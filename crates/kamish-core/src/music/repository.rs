@@ -8,7 +8,8 @@ pub struct MusicRepository;
 impl MusicRepository {
     /// Insert or update a track in the catalog.
     pub async fn upsert_track(pool: &DbPool, track: &Track) -> Result<()> {
-        let dur = track.duration_secs.map(|d| d as i64);
+        let dur = track.duration_secs.map(|d| d as i64).unwrap_or(0);
+        let uri = track.uri.as_deref().unwrap_or("");
         sqlx::query(
             r#"
             INSERT INTO music_tracks (id, title, artist, duration_secs, source, uri, extra_json)
@@ -27,7 +28,7 @@ impl MusicRepository {
         .bind(&track.artist)
         .bind(dur)
         .bind(&track.source)
-        .bind(&track.uri)
+        .bind(uri)
         .bind(&track.extra_json)
         .execute(pool)
         .await?;

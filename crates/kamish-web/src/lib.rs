@@ -68,7 +68,10 @@ mod tests {
     #[tokio::test]
     async fn test_web_core_offline_returns_503() {
         let mock_ipc = IpcClient::mock(|_| {
-            CoreResponse::err("core_offline", "Ядро колонки недоступно или перезапускается")
+            CoreResponse::err(
+                "core_offline",
+                "Ядро колонки недоступно или перезапускается",
+            )
         });
 
         let (app, _) = build_web_app("sqlite::memory:", mock_ipc, false)
