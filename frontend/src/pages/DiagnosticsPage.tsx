@@ -35,7 +35,7 @@ export const DiagnosticsPage: React.FC<DiagnosticsPageProps> = ({
   const memPercent = Math.min(100, Math.round((memUsed / memTotal) * 100));
 
   const cpuTemp = status?.hardware?.cpu_temp_celsius ?? status?.device.cpu_temp_celsius;
-  const hardwareModel = status?.hardware?.model || status?.device.hardware_model || 'Orange Pi Zero 3';
+  const hardwareModel = status?.hardware?.model || status?.device.hardware_model || 'kamish';
 
   const subsystemDescriptions: Record<string, string> = {
     audio: 'Микрофонный массив Seeed ReSpeaker XVF3800 и акустика GT-112',
@@ -260,11 +260,11 @@ export const DiagnosticsPage: React.FC<DiagnosticsPageProps> = ({
       {/* Runtime Environment Info */}
       <Card
         title="Среда выполнения и хост"
-        subtitle="Параметры сборки ядра и системы Armbian"
+        subtitle="Параметры сборки ядра и системы Buildroot"
       >
         <div className="bg-slate-900 text-slate-100 rounded-lg p-4 font-mono text-xs space-y-1.5 overflow-x-auto">
-          <div><span className="text-slate-500">$</span> smart-speaker --version</div>
-          <div className="text-slate-300">smart-speaker-backend {status?.version || '0.1.0'} (rustc edition 2021)</div>
+          <div><span className="text-slate-500">$</span> kamish --version</div>
+          <div className="text-slate-300">kamish-backend {status?.version || '0.1.0'} (rustc edition 2021)</div>
           <div><span className="text-slate-500">$</span> uname -srm</div>
           <div className="text-slate-300">{status?.device.os_name} {status?.device.kernel_version} {status?.device.arch}</div>
           <div><span className="text-slate-500">$</span> tokio-runtime</div>

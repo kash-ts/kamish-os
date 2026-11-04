@@ -45,8 +45,8 @@ export const SystemPage: React.FC = () => {
   const storageTotal = telemetry?.storage_total_bytes ?? status?.device.storage_total_bytes ?? 0;
   const storagePercent = storageTotal > 0 ? Math.min(100, Math.round((storageUsed / storageTotal) * 100)) : 0;
 
-  const hardwareModel = status?.device.hardware_model || telemetry?.model || 'Orange Pi Zero 3';
-  const osString = [status?.device.os_name, status?.device.os_version].filter(Boolean).join(' ') || 'Armbian Linux';
+  const hardwareModel = status?.device.hardware_model || telemetry?.model || 'kamish';
+  const osString = [status?.device.os_name, status?.device.os_version].filter(Boolean).join(' ') || 'Kamish Linux (Buildroot)';
 
   return (
     <div className="space-y-6">

@@ -571,7 +571,7 @@ export const SettingsPreviewPage: React.FC = () => {
       <div>
         <h1 className="text-2xl font-bold text-slate-100 tracking-tight">Настройки системы</h1>
         <p className="text-sm text-slate-400 mt-0.5">
-          Управление периферией Orange Pi Zero 3, акустикой GT-112, беспроводными интерфейсами и безопасным туннелем.
+          Управление периферией устройства, акустикой GT-112, беспроводными интерфейсами и безопасным туннелем.
         </p>
       </div>
 
@@ -1203,7 +1203,7 @@ export const SettingsPreviewPage: React.FC = () => {
                 </div>
                 <div className="flex justify-between py-1">
                   <span className="text-slate-400">Целевая платформа</span>
-                  <span className="text-slate-300 font-mono text-xs">Orange Pi Zero 3 (H618 ARM64)</span>
+                  <span className="text-slate-300 font-mono text-xs">kamish (ARM64)</span>
                 </div>
               </div>
             </Card>
