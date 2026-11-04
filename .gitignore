@@ -1,0 +1,31 @@
+# Rust
+/backend/target/
+**/*.rs.bk
+Cargo.lock
+
+# Databases and runtime data
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Environment files
+.env
+.env.*
+!.env.example
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Temporary / downloads
+downloads/
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+*.local
+
