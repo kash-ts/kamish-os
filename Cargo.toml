@@ -1,0 +1,14 @@
+[workspace]
+members = [
+    "crates/kamish-ipc",
+    "crates/kamish-core",
+    "crates/kamish-web",
+    "backend",
+]
+resolver = "2"
+
+[profile.dev]
+debug = 1
+
+[profile.test]
+debug = 1
