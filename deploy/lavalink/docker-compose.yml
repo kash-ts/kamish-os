@@ -1,0 +1,21 @@
+services:
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4-alpine
+    container_name: kamish-lavalink
+    restart: unless-stopped
+    environment:
+      - _JAVA_OPTIONS=-Xmx256m -XX:+UseSerialGC
+      - LAVALINK_SERVER_PASSWORD=youshallnotpass
+      - YANDEX_MUSIC_TOKEN=${YANDEX_MUSIC_TOKEN:-}
+    volumes:
+      - ./application.yml:/opt/Lavalink/application.yml:ro
+      - ./plugins:/opt/Lavalink/plugins
+      - ./logs:/opt/Lavalink/logs
+    ports:
+      - "2333:2333"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --spider -q --header='Authorization: youshallnotpass' http://localhost:2333/v4/info || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 20s

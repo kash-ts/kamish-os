@@ -23,6 +23,12 @@ import {
   getMusicRecommendations,
   getRadioStations,
   getMusicHistory,
+  getLavalinkStatus,
+  updateLavalinkConfig,
+  getYouTubeAuthStatus,
+  beginYouTubeAuth,
+  finishYouTubeAuth,
+  logoutYouTubeAuth,
 } from '../api';
 import type {
   PlaybackState,
@@ -31,6 +37,9 @@ import type {
   RadioStation,
   RecommendationItem,
   HistoryItem,
+  LavalinkStatus,
+  YouTubeAuthStatus,
+  DeviceCodeChallenge,
 } from '../types';
 
 export const MusicPage: React.FC = () => {
@@ -58,6 +67,41 @@ export const MusicPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'radio' | 'recommendations' | 'favorites' | 'history'>('radio');
   const [isMuted, setIsMuted] = useState(false);
   const [prevVolume, setPrevVolume] = useState(50);
+
+  // Lavalink Multi-Source Streaming state
+  const [lavalinkStatus, setLavalinkStatus] = useState<LavalinkStatus | null>(null);
+  const [showLavalinkConfig, setShowLavalinkConfig] = useState(false);
+  const [yandexToken, setYandexToken] = useState('');
+  const [isSavingLavalink, setIsSavingLavalink] = useState(false);
+  const [lavalinkSaveMsg, setLavalinkSaveMsg] = useState('');
+
+  // YouTube OAuth 2.0 Device Flow state
+  const [ytStatus, setYtStatus] = useState<YouTubeAuthStatus | null>(null);
+  const [showYtAuth, setShowYtAuth] = useState(false);
+  const [ytClientId, setYtClientId] = useState('');
+  const [ytClientSecret, setYtClientSecret] = useState('');
+  const [ytChallenge, setYtChallenge] = useState<DeviceCodeChallenge | null>(null);
+  const [isStartingYtAuth, setIsStartingYtAuth] = useState(false);
+  const [isCheckingYtAuth, setIsCheckingYtAuth] = useState(false);
+  const [ytAuthMsg, setYtAuthMsg] = useState('');
+
+  const refreshYtStatus = useCallback(async () => {
+    try {
+      const st = await getYouTubeAuthStatus();
+      setYtStatus(st);
+    } catch {
+      // offline / not configured
+    }
+  }, []);
+
+  const refreshLavalink = useCallback(async () => {
+    try {
+      const st = await getLavalinkStatus();
+      setLavalinkStatus(st);
+    } catch {
+      // Lavalink not responding or offline
+    }
+  }, []);
 
   const refreshPlayback = useCallback(async () => {
     try {
@@ -96,10 +140,77 @@ export const MusicPage: React.FC = () => {
   useEffect(() => {
     refreshPlayback();
     loadInitialData();
+    refreshLavalink();
+    refreshYtStatus();
 
     const interval = setInterval(refreshPlayback, 3000);
     return () => clearInterval(interval);
-  }, [refreshPlayback, loadInitialData]);
+  }, [refreshPlayback, loadInitialData, refreshLavalink, refreshYtStatus]);
+
+  const handleSaveLavalinkConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingLavalink(true);
+    setLavalinkSaveMsg('');
+    try {
+      const res = await updateLavalinkConfig({
+        yandex_music_token: yandexToken,
+      });
+      setLavalinkStatus(res.lavalink);
+      setLavalinkSaveMsg('Настройки Lavalink успешно сохранены');
+      setTimeout(() => setLavalinkSaveMsg(''), 4000);
+    } catch (err) {
+      console.error('Failed to save Lavalink config:', err);
+      setLavalinkSaveMsg('Ошибка сохранения настроек');
+    } finally {
+      setIsSavingLavalink(false);
+    }
+  };
+
+  const handleBeginYtAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsStartingYtAuth(true);
+    setYtAuthMsg('');
+    try {
+      const challenge = await beginYouTubeAuth(ytClientId.trim(), ytClientSecret.trim());
+      setYtChallenge(challenge);
+      setYtAuthMsg('Ссылка для авторизации готова. Перейдите по ссылке и подтвердите доступ.');
+    } catch (err: any) {
+      console.error('Failed to begin YouTube auth:', err);
+      setYtAuthMsg(err?.message || 'Ошибка генерации ссылки');
+    } finally {
+      setIsStartingYtAuth(false);
+    }
+  };
+
+  const handleFinishYtAuth = async () => {
+    if (!ytChallenge) return;
+    setIsCheckingYtAuth(true);
+    setYtAuthMsg('');
+    try {
+      const res = await finishYouTubeAuth(ytChallenge.device_code);
+      setYtStatus(res);
+      setYtChallenge(null);
+      setYtAuthMsg('Авторизация успешно завершена! Куки сгенерированы на сервере.');
+      setTimeout(() => setYtAuthMsg(''), 5000);
+    } catch (err: any) {
+      console.error('Failed to finish YouTube auth:', err);
+      setYtAuthMsg('Ожидание подтверждения... Нажмите «Разрешить» в окне Google и повторите.');
+    } finally {
+      setIsCheckingYtAuth(false);
+    }
+  };
+
+  const handleLogoutYtAuth = async () => {
+    try {
+      await logoutYouTubeAuth();
+      refreshYtStatus();
+      setYtChallenge(null);
+      setYtAuthMsg('Учётные данные и файл cookies.txt удалены');
+      setTimeout(() => setYtAuthMsg(''), 4000);
+    } catch (err) {
+      console.error('Logout error:', err);
+    }
+  };
 
   const handlePlayPause = async () => {
     try {
@@ -353,6 +464,216 @@ export const MusicPage: React.FC = () => {
         </div>
       </div>
 
+      {/* Lavalink Multi-Source Status & Quick Config */}
+      <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                lavalinkStatus?.connected ? 'bg-emerald-500' : 'bg-slate-300'
+              }`}
+            />
+            <span className="text-xs font-semibold text-slate-900">
+              Музыкальный сервер Lavalink v4
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {lavalinkStatus?.connected
+                ? `(Активен: ${lavalinkStatus.host}:${lavalinkStatus.port})`
+                : '(Режим прямого воспроизведения MPV)'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200">
+              YouTube
+            </span>
+            <span
+              className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium border ${
+                lavalinkStatus?.yandex_music_configured
+                  ? 'bg-amber-50 text-amber-800 border-amber-200'
+                  : 'bg-slate-50 text-slate-600 border-slate-200'
+              }`}
+            >
+              Яндекс Музыка {lavalinkStatus?.yandex_music_configured ? '✓' : '(нужен токен)'}
+            </span>
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-orange-50 text-orange-700 border border-orange-200">
+              SoundCloud
+            </span>
+
+            <button
+              type="button"
+              onClick={() => setShowLavalinkConfig(!showLavalinkConfig)}
+              className="text-xs text-slate-600 hover:text-slate-900 underline ml-2 cursor-pointer"
+            >
+              {showLavalinkConfig ? 'Скрыть настройки' : 'Настроить'}
+            </button>
+          </div>
+        </div>
+
+        {showLavalinkConfig && (
+          <form
+            onSubmit={handleSaveLavalinkConfig}
+            className="pt-3 border-t border-slate-100 flex flex-col sm:flex-row gap-3 items-end"
+          >
+            <div className="flex-1 w-full">
+              <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                OAuth токен Яндекс Музыки (для воспроизведения полных треков по подписке Яндекс Плюс)
+              </label>
+              <input
+                type="password"
+                value={yandexToken}
+                onChange={(e) => setYandexToken(e.target.value)}
+                placeholder={
+                  lavalinkStatus?.yandex_music_configured
+                    ? '•••••••••••••••• (токен сохранён)'
+                    : 'Вставьте OAuth-токен аккаунта Яндекс'
+                }
+                className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-800"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isSavingLavalink || !yandexToken.trim()}
+              className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer shadow-xs whitespace-nowrap"
+            >
+              {isSavingLavalink ? 'Сохранение...' : 'Сохранить токен'}
+            </button>
+            {lavalinkSaveMsg && (
+              <span className="text-xs text-emerald-600 self-center">{lavalinkSaveMsg}</span>
+            )}
+          </form>
+        )}
+      </div>
+
+      {/* YouTube OAuth Device Flow (One-Click Link Authorization) */}
+      <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span
+              className={`w-2.5 h-2.5 rounded-full ${
+                ytStatus?.authorized && ytStatus?.cookies_ready
+                  ? 'bg-emerald-500'
+                  : 'bg-amber-400'
+              }`}
+            />
+            <span className="text-xs font-semibold text-slate-900">
+              Авторизация YouTube / Google
+            </span>
+            <span className="text-[11px] text-slate-500">
+              {ytStatus?.authorized && ytStatus?.cookies_ready
+                ? '✓ Авторизован (файл cookies.txt активен)'
+                : '(Требуется для обхода блокировок Google и бот-проверок)'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {ytStatus?.authorized ? (
+              <button
+                type="button"
+                onClick={handleLogoutYtAuth}
+                className="text-xs text-red-600 hover:text-red-800 underline cursor-pointer"
+              >
+                Выйти из Google
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setShowYtAuth(!showYtAuth)}
+                className="text-xs text-slate-600 hover:text-slate-900 underline cursor-pointer"
+              >
+                {showYtAuth ? 'Скрыть' : 'Авторизоваться ссылкой'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {showYtAuth && !ytStatus?.authorized && (
+          <div className="pt-3 border-t border-slate-100 flex flex-col gap-3">
+            {!ytChallenge ? (
+              <form onSubmit={handleBeginYtAuth} className="flex flex-col sm:flex-row gap-3 items-end">
+                <div className="flex-1 w-full">
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Google OAuth Client ID (тип: TV and Limited Input devices)
+                  </label>
+                  <input
+                    type="text"
+                    value={ytClientId}
+                    onChange={(e) => setYtClientId(e.target.value)}
+                    placeholder="Например: 123456789-abc.apps.googleusercontent.com"
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-800"
+                    required
+                  />
+                </div>
+                <div className="flex-1 w-full">
+                  <label className="block text-[11px] font-medium text-slate-600 mb-1">
+                    Client Secret
+                  </label>
+                  <input
+                    type="password"
+                    value={ytClientSecret}
+                    onChange={(e) => setYtClientSecret(e.target.value)}
+                    placeholder="GOCSPX-..."
+                    className="w-full px-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:ring-1 focus:ring-slate-800"
+                    required
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isStartingYtAuth || !ytClientId.trim() || !ytClientSecret.trim()}
+                  className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer shadow-xs whitespace-nowrap"
+                >
+                  {isStartingYtAuth ? 'Генерация ссылки...' : 'Сгенерировать ссылку'}
+                </button>
+              </form>
+            ) : (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <h5 className="text-xs font-semibold text-slate-900">
+                      Шаг 1: Подтвердите доступ в Google
+                    </h5>
+                    <p className="text-[11px] text-slate-600 mt-0.5">
+                      Код авторизации:{' '}
+                      <span className="font-mono font-bold text-sm text-slate-900 px-2 py-0.5 bg-white border border-slate-200 rounded">
+                        {ytChallenge.user_code}
+                      </span>
+                    </p>
+                  </div>
+
+                  <a
+                    href={`${ytChallenge.verification_url}?user_code=${encodeURIComponent(
+                      ytChallenge.user_code
+                    )}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-medium transition-colors cursor-pointer shadow-xs"
+                  >
+                    Перейти и подтвердить в один клик ↗
+                  </a>
+                </div>
+
+                <div className="pt-2 border-t border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <p className="text-[11px] text-slate-500">
+                    Шаг 2: После нажатия кнопки «Разрешить» в Google, нажмите кнопку справа:
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={handleFinishYtAuth}
+                    disabled={isCheckingYtAuth}
+                    className="px-4 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-colors disabled:opacity-50 cursor-pointer shadow-xs"
+                  >
+                    {isCheckingYtAuth ? 'Проверка...' : 'Завершить вход и создать куки'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {ytAuthMsg && <p className="text-xs text-slate-600">{ytAuthMsg}</p>}
+          </div>
+        )}
+      </div>
+
       {/* Search Bar */}
       <div className="bg-white rounded-xl p-4 border border-slate-200/80 shadow-xs">
         <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-3">
@@ -374,7 +695,9 @@ export const MusicPage: React.FC = () => {
               className="bg-white border border-slate-200 rounded-lg px-3 py-2 text-xs text-slate-900"
             >
               <option value="all">Все источники</option>
-              <option value="ytmusic">YouTube Music</option>
+              <option value="youtube">YouTube Music</option>
+              <option value="yandex">Яндекс Музыка (Lavalink)</option>
+              <option value="soundcloud">SoundCloud (Lavalink)</option>
               <option value="radio">Интернет-радио</option>
               <option value="local">Локальная медиатека</option>
             </select>

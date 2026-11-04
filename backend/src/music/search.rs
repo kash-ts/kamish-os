@@ -67,11 +67,45 @@ impl SearchService {
             }
         }
 
-        // 3. Search YouTube Music / YouTube / Online
-        if target_source == "all"
+        // 3. Search via Lavalink v4 (YouTube, Yandex Music, SoundCloud)
+        if !is_audio_muted() {
+            let lavalink = crate::music::lavalink::LavalinkClient::default();
+            if lavalink.is_alive().await {
+                match target_source.as_str() {
+                    "all" => {
+                        let ll_results = lavalink
+                            .search_all_sources(q, limit.saturating_sub(results.len()))
+                            .await;
+                        results.extend(ll_results);
+                    }
+                    "youtube" | "ytmusic" | "online" => {
+                        let ll_results = lavalink.search_youtube(q).await;
+                        results.extend(ll_results);
+                    }
+                    "yandex" | "yandexmusic" | "ym" => {
+                        let ll_results = lavalink.search_yandex(q).await;
+                        results.extend(ll_results);
+                    }
+                    "soundcloud" | "sc" => {
+                        let ll_results = lavalink.search_soundcloud(q).await;
+                        results.extend(ll_results);
+                    }
+                    _ => {}
+                }
+
+                if results.len() >= limit {
+                    results.truncate(limit);
+                    return results;
+                }
+            }
+        }
+
+        // 4. Fallback search (Local YtMusic microservice / yt-dlp)
+        if (target_source == "all"
             || target_source == "ytmusic"
             || target_source == "youtube"
-            || target_source == "online"
+            || target_source == "online")
+            && results.len() < limit
         {
             // Check if muted (test environment) or offline
             if !is_audio_muted() {
@@ -100,7 +134,7 @@ impl SearchService {
             }
         }
 
-        // 4. Safe fallback if nothing matched (offline / no network / test)
+        // 5. Safe fallback if nothing matched (offline / no network / test)
         if results.is_empty() {
             results.push(SearchResult {
                 id: format!("mock:{}", uuid::Uuid::new_v4()),
@@ -122,19 +156,23 @@ impl SearchService {
         let count = limit.clamp(1, 10);
         let search_arg = format!("ytsearch{count}:{query}");
 
-        let cmd_res = tokio::time::timeout(
-            Duration::from_secs(3),
-            Command::new("yt-dlp")
-                .arg("--default-search")
-                .arg("ytsearch")
-                .arg("--get-title")
-                .arg("--get-id")
-                .arg("--get-duration")
-                .arg("--no-warnings")
-                .arg(&search_arg)
-                .output(),
-        )
-        .await;
+        let cookies_path = std::env::var("KAMISH_YOUTUBE_COOKIES_PATH")
+            .unwrap_or_else(|_| "/var/lib/kamish/youtube-cookies.txt".to_string());
+
+        let mut cmd = Command::new("yt-dlp");
+        cmd.arg("--default-search")
+            .arg("ytsearch")
+            .arg("--get-title")
+            .arg("--get-id")
+            .arg("--get-duration")
+            .arg("--no-warnings");
+
+        if std::path::Path::new(&cookies_path).exists() {
+            cmd.arg("--cookies").arg(&cookies_path);
+        }
+        cmd.arg(&search_arg);
+
+        let cmd_res = tokio::time::timeout(Duration::from_secs(4), cmd.output()).await;
 
         let mut results = Vec::new();
 

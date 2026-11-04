@@ -105,6 +105,14 @@ pub fn create_router(state: AppState) -> Router {
             get(music::get_recommendations_handler),
         )
         .route("/v1/music/radio", get(music::get_radio_handler))
+        .route(
+            "/v1/music/lavalink/status",
+            get(music::lavalink_status_handler),
+        )
+        .route(
+            "/v1/music/lavalink/config",
+            post(music::lavalink_config_handler),
+        )
         // YouTube OAuth (device flow, panel-driven)
         .route(
             "/v1/music/youtube/auth/status",

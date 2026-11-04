@@ -48,6 +48,10 @@ import type {
   SshToggleResponse,
   LoginRequest,
   LoginResponse,
+  LavalinkStatus,
+  LavalinkConfigRequest,
+  YouTubeAuthStatus,
+  DeviceCodeChallenge,
   SessionResponse,
   ChangePasswordRequest,
   ChangePasswordResponse,
@@ -426,6 +430,73 @@ export async function getMusicHistory(
     headers: { Accept: 'application/json' },
   });
   return handleResponse<{ count: number; history: HistoryItem[] }>(res);
+}
+
+// Lavalink Multi-Source Music Server API
+export async function getLavalinkStatus(): Promise<LavalinkStatus> {
+  const res = await apiFetch(`${BASE_URL}/music/lavalink/status`, {
+    headers: { Accept: 'application/json' },
+  });
+  return handleResponse<LavalinkStatus>(res);
+}
+
+export async function updateLavalinkConfig(
+  data: LavalinkConfigRequest
+): Promise<{ status: string; lavalink: LavalinkStatus }> {
+  const res = await apiFetch(`${BASE_URL}/music/lavalink/config`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+  return handleResponse<{ status: string; lavalink: LavalinkStatus }>(res);
+}
+
+// YouTube OAuth 2.0 Device Flow API
+export async function getYouTubeAuthStatus(): Promise<YouTubeAuthStatus> {
+  const res = await apiFetch(`${BASE_URL}/music/youtube/auth/status`, {
+    headers: { Accept: 'application/json' },
+  });
+  return handleResponse<YouTubeAuthStatus>(res);
+}
+
+export async function beginYouTubeAuth(
+  clientId: string,
+  clientSecret: string
+): Promise<DeviceCodeChallenge> {
+  const res = await apiFetch(`${BASE_URL}/music/youtube/auth/begin`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ client_id: clientId, client_secret: clientSecret }),
+  });
+  return handleResponse<DeviceCodeChallenge>(res);
+}
+
+export async function finishYouTubeAuth(
+  deviceCode: string
+): Promise<YouTubeAuthStatus> {
+  const res = await apiFetch(`${BASE_URL}/music/youtube/auth/finish`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ device_code: deviceCode }),
+  });
+  return handleResponse<YouTubeAuthStatus>(res);
+}
+
+export async function logoutYouTubeAuth(): Promise<{ status: string }> {
+  const res = await apiFetch(`${BASE_URL}/music/youtube/auth/logout`, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+  });
+  return handleResponse<{ status: string }>(res);
 }
 
 // Stage 6 Speech Manager API
