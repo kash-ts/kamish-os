@@ -1,0 +1,43 @@
+[package]
+name = "kamish-web"
+version = "0.1.0"
+edition = "2021"
+authors = ["Kamish Team"]
+description = "Web panel backend and HTTP API gateway for Kamish OS"
+
+[lib]
+name = "kamish_web"
+path = "src/lib.rs"
+
+[[bin]]
+name = "kamish-web"
+path = "src/main.rs"
+
+[dependencies]
+kamish-ipc = { path = "../kamish-ipc" }
+tokio = { version = "1.41", features = ["full"] }
+axum = { version = "0.8", features = ["ws", "multipart"] }
+tower = { version = "0.5" }
+tower-http = { version = "0.6", features = ["cors", "trace", "fs"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+sqlx = { version = "0.8", features = ["runtime-tokio", "sqlite", "migrate", "chrono"] }
+chrono = { version = "0.4", features = ["serde"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1.0"
+thiserror = "2.0"
+dotenvy = "0.15"
+uuid = { version = "1.29.0", features = ["v4", "serde"] }
+argon2 = "0.5"
+rand = "0.8"
+base64 = "0.22"
+futures-util = "0.3"
+
+[dev-dependencies]
+tokio = { version = "1.41", features = ["full", "test-util"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+tokio-tungstenite = "0.29"
+futures-util = "0.3"
+tempfile = "3"
