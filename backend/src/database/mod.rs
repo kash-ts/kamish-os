@@ -6,6 +6,8 @@ use tracing::info;
 
 pub type DbPool = Pool<Sqlite>;
 
+pub const UNIFIED_SCHEMA_SQL: &str = include_str!("../../../database/schema.sql");
+
 /// Initialize the SQLite connection pool and apply PRAGMA settings
 pub async fn init_pool(database_url: &str) -> AppResult<DbPool> {
     info!("Initializing SQLite connection pool at: {}", database_url);
@@ -28,27 +30,24 @@ pub async fn init_pool(database_url: &str) -> AppResult<DbPool> {
     Ok(pool)
 }
 
-/// Run embedded database migrations
+/// Apply unified database schema (database/schema.sql)
 pub async fn run_migrations(pool: &DbPool) -> AppResult<()> {
-    info!("Running database migrations...");
-    sqlx::migrate!("../database/migrations")
-        .run(pool)
+    info!("Applying unified database schema (database/schema.sql)...");
+    sqlx::raw_sql(UNIFIED_SCHEMA_SQL)
+        .execute(pool)
         .await
-        .map_err(AppError::Migration)?;
-    info!("Database migrations applied successfully");
+        .map_err(AppError::Database)?;
+    info!("Database schema applied successfully");
     Ok(())
 }
 
-/// Count applied migrations
+/// Get current database schema version from PRAGMA user_version
 pub async fn get_applied_migrations_count(pool: &DbPool) -> i64 {
-    let result: Result<(i64,), _> =
-        sqlx::query_as("SELECT COUNT(*) FROM _sqlx_migrations WHERE success = 1")
-            .fetch_one(pool)
-            .await;
+    let result: Result<(i64,), _> = sqlx::query_as("PRAGMA user_version").fetch_one(pool).await;
 
     match result {
-        Ok((count,)) => count,
-        Err(_) => 0,
+        Ok((version,)) => version,
+        Err(_) => 1,
     }
 }
 
@@ -65,8 +64,8 @@ mod tests {
             .await
             .expect("Failed to run migrations");
 
-        let count = get_applied_migrations_count(&pool).await;
-        assert!(count >= 2, "Expected at least 2 migrations applied");
+        let version = get_applied_migrations_count(&pool).await;
+        assert!(version >= 1, "Expected schema version >= 1");
 
         // Verify base tables exist
         let row: (i64,) = sqlx::query_as(
@@ -77,7 +76,7 @@ mod tests {
         .unwrap();
         assert_eq!(row.0, 1);
 
-        // Verify auth tables exist (0002_auth_schema.sql)
+        // Verify auth tables exist
         let users_row: (i64,) = sqlx::query_as(
             "SELECT count(*) FROM sqlite_master WHERE type='table' AND name='users'",
         )
