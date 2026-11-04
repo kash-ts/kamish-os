@@ -1,0 +1,189 @@
+# Smart Speaker (Автономная умная колонка)
+
+Автономная умная колонка на базе микрокомпьютера **Orange Pi Zero 3 (Allwinner H618, 4 GB RAM, ARM64)**, микрофонного массива **Seeed ReSpeaker XVF3800** и акустической системы **GT-112**, работающая под управлением **Armbian Linux (Debian Bookworm ARM64 Minimal)**.
+
+Проект спроектирован по принципу **Offline-First**: все базовые функции (будильники, напоминания, воспроизведение локальной музыки, индикация статуса, синтез системных оповещений) полностью функциональны без доступа к интернету и облачному ИИ.
+
+---
+
+## 🌟 Ключевые возможности
+
+1. **Голосовое управление и аудиопроцессинг (Этап 6)**:
+   - Аппаратный микрофонный массив **Seeed ReSpeaker XVF3800** (AEC, Beamforming, шумоподавление, 16 кГц, 16 бит PCM).
+   - Встроенный чистый Rust детектор речевой активности (**RMS + ZCR VAD**) с настраиваемым порогом и hangover.
+   - Офлайн-споттер ключевых слов («ассистент», «колонка», «слушай»).
+   - Модульные провайдеры STT (Vosk, Sherpa-onnx, Cloud) и TTS (Piper, RHVoice, Cloud) с автономным WAV-генератором речи.
+2. **AI-оркестратор и Tool Registry (Этап 4)**:
+   - Интеграция с языковой моделью через процесс **Antigravity CLI** и резервный оффлайн **MockAiClient**.
+   - Строгая изоляция: ИИ не имеет прямого доступа к shell, файловой системе или секретам.
+   - Строго типизированный реестр из **14 инструментов** (`create_alarm`, `delete_alarm`, `list_alarms`, `snooze_alarm`, `create_reminder`, `list_reminders`, `set_volume`, `play_music`, `pause_music`, `resume_music`, `stop_music`, `search_music`, `get_current_track`, `get_device_status`).
+   - Прозрачный возврат ошибок инструментов пользователю без фальсификации успеха.
+3. **Мультимедийный плеер (Этап 5)**:
+   - Headless управление **MPV** через IPC UNIX-сокет (`/tmp/mpv-smart-speaker.sock`) с виртуальным mock-фолбэком.
+   - Потоковое воспроизведение из YouTube Music (`yt-dlp`), интернет-радиостанций и локальных файлов.
+   - Алгоритм локальных рекомендаций на основе лайков, истории прослушиваний и штрафов за пропуск.
+4. **Bluetooth A2DP Sink (Этап 7)**:
+   - Превращение колонки в беспроводную акустику для смартфонов и ПК через BlueZ / BlueALSA.
+   - Управление сопряжением (Pair), подключением (Connect) и режимом видимости (Discoverable).
+5. **Сетевой стек и Setup AP (Этап 7)**:
+   - NetworkManager (`nmcli`): автоматическое сканирование сетей Wi-Fi, безопасное подключение и переключение.
+   - Режим первичной настройки **SmartSpeaker-Setup AP** (192.168.4.1) для первоначального конфигурирования без экрана.
+   - Доступ по mDNS адресу: `http://<hostname>.local:8080`.
+6. **Безопасный туннель VLESS / Reality (Этап 7)**:
+   - Интеграция клиента Happ/VLESS для обхода региональных блокировок музыкальных сервисов.
+   - Строгая маскировка секретов: пароли Wi-Fi, ключи VPN и токены никогда не попадают в логи и API.
+7. **Аппаратная телеметрия и защита акустики (Этап 8)**:
+   - Мониторинг температуры Allwinner H618 (`/sys/class/thermal/thermal_zone0/temp`), частоты ядер и троттлинга ($\ge 80^\circ\text{C}$).
+   - Программный лимитер максимальной громкости (**Safe Volume Ceiling = 85%**) для защиты динамиков GT-112 от клиппинга и перегрева.
+   - Селектор аудиомаршрутов (GT-112 ALSA Line Out, Bluetooth Sink, Headphones 3.5mm, System Sink).
+8. **Веб-панель управления (Этап 3)**:
+   - SPA на React 19, TypeScript и Tailwind CSS без визуального перегруза (дизайн очищен по стандарту `kill-ai-slop`).
+   - Раздаётся непосредственно бэкендом Axum из директории `frontend/dist`.
+   - Синхронизация в реальном времени через шину WebSocket (`WS /api/v1/events`).
+
+---
+
+## 🏗 Архитектура репозитория
+
+```
+radiant-bardeen/
+├── backend/                  # Rust бэкенд (модульный монолит)
+│   ├── Cargo.toml
+│   ├── src/
+│   │   ├── main.rs           # Точка входа, graceful shutdown
+│   │   ├── lib.rs            # Модульный корень
+│   │   ├── ai/               # AI Orchestrator, CLI клиент, Mock клиент, 14 Tools
+│   │   ├── api/              # Axum REST обработчики & WebSocket шина
+│   │   ├── audio/            # OutputManager, Safe Ceiling, Alert tone гонг
+│   │   ├── bluetooth/        # BlueZ / bluetoothctl контроллер
+│   │   ├── common/           # Ошибки, AppState, макросы
+│   │   ├── config/           # Настройки окружения
+│   │   ├── database/         # SQLite пул, миграции
+│   │   ├── music/            # MPV контроллер, радио, рекомендации, история
+│   │   ├── network/          # Wi-Fi сканер, подключение, Setup AP
+│   │   ├── scheduler/        # Планировщик будильников/напоминаний, chrono-tz
+│   │   ├── speech/           # VAD, WakeWord, STT, TTS, offline synthesizer
+│   │   ├── system/           # Аппаратная телеметрия, сенсоры H618, ReSpeaker
+│   │   └── vpn/              # VLESS Reality менеджер с маскированием
+│   └── tests/                # 10 файлов интеграционных тестов (70 тестов)
+├── frontend/                 # Клиентская веб-панель
+│   ├── package.json
+│   ├── src/
+│   │   ├── api/              # Строго типизированный API-клиент ко всем эндпоинтам
+│   │   ├── components/       # UI компоненты (Navbar, Card, Modal, AiAssistant и др.)
+│   │   ├── pages/            # Dashboard, Music, Alarms, Diagnostics, Settings
+│   │   └── types/            # TypeScript контракты моделей данных
+│   └── dist/                 # Скомпилированный статический бандл
+├── database/                 # SQLite миграции
+│   └── migrations/
+│       └── 0001_initial_schema.sql
+├── deploy/                   # Файлы развёртывания на железо
+│   ├── armbian/
+│   │   └── install.sh        # Скрипт автоматической установки на Orange Pi Zero 3
+│   ├── scripts/
+│   │   └── hardware_check.sh # Автономная диагностика периферии и звука
+│   └── systemd/
+│       ├── smart-speaker.service  # Изолированный systemd unit
+│       └── 99-respeaker.rules      # Правила udev для Seeed ReSpeaker XVF3800
+├── docs/                     # Документация
+│   ├── API.md                # Полная спецификация всех 35+ REST и WS эндпоинтов
+│   ├── ARCHITECTURE.md       # Подробная архитектура подсистем
+│   ├── HARDWARE.md           # Электрическая схема, питание, протокол GT-112
+│   └── SECURITY.md           # Модель угроз и правила безопасности
+├── AGENTS.md                 # Правила разработки и технические регламенты
+└── README.md
+```
+
+---
+
+## 🚀 Быстрый запуск для разработки (Linux x86_64)
+
+### Требования
+- **Rust**: 1.75+ (`rustup default stable`)
+- **Node.js**: 18+ и `npm`
+- **SQLite 3**
+- **MPV** (опционально, при отсутствии переходит на mock)
+
+### 1. Сборка фронтенда
+```bash
+cd frontend
+npm install
+npm run build
+cd ..
+```
+Статические файлы автоматически соберутся в `frontend/dist/`.
+
+### 2. Запуск тестов бэкенда
+```bash
+cd backend
+cargo test
+```
+> [!NOTE]
+> Все 70 интеграционных и модульных тестов выполняются бесшумно за ~2.5 секунды. Проверка наличия тестового раннера автоматически глушит вывод звука (`set_audio_muted(true)`).
+
+### 3. Запуск сервиса
+```bash
+cd backend
+cargo run
+```
+Сервис запустится по адресу `http://0.0.0.0:8080`.
+Откройте браузер по адресу `http://localhost:8080/` (или `http://<hostname>.local:8080`).
+
+---
+
+## 📦 Развёртывание на Orange Pi Zero 3 (ARM64)
+
+1. Установите **Armbian Debian Bookworm Minimal** на microSD карту.
+2. Подключите Seeed ReSpeaker XVF3800 к USB-порту и акустику GT-112 к аналоговому аудиовыходу (разъём 3.5мм или линейные пины).
+3. Скопируйте репозиторий на плату и запустите скрипт автоматической установки:
+   ```bash
+   sudo ./deploy/armbian/install.sh
+   ```
+4. Скрипт:
+   - Установит системные пакеты (`mpv`, `yt-dlp`, `bluez`, `network-manager`, `libasound2`).
+   - Настроит правила `udev` для питания ReSpeaker XVF3800.
+   - Скомпилирует и установит бинарник `/usr/local/bin/smart-speaker`.
+   - Запустит и включит автозагрузку службы `smart-speaker.service`.
+5. Проверьте диагностику железа:
+   ```bash
+   ./deploy/scripts/hardware_check.sh
+   # С воспроизведением тестового звукового тона:
+   ./deploy/scripts/hardware_check.sh --test-audio
+   ```
+
+---
+
+## 📡 Сводка основных API эндпоинтов
+
+| Метод | Эндпоинт | Описание |
+|---|---|---|
+| `GET` | `/api/v1/status` | Системный статус, аптайм, телеметрия и здоровье подсистем |
+| `GET` | `/api/v1/system/hardware` | Детальная аппаратная телеметрия SoC и USB |
+| `POST`| `/api/v1/system/audio/volume` | Установка громкости с лимитером Safe Ceiling |
+| `POST`| `/api/v1/system/audio/route` | Переключение аудиовыхода (GT-112 / BT / Jack) |
+| `GET`/`POST` | `/api/v1/alarms` | Список и создание будильников (разовые, дни недели, зоны) |
+| `GET`/`POST` | `/api/v1/reminders` | Список и создание напоминаний |
+| `POST`| `/api/v1/ai/prompt` | Запрос к ИИ с выполнением зарегистрированных инструментов |
+| `GET` | `/api/v1/ai/tools` | Список всех 14 зарегистрированных схем инструментов |
+| `GET`/`POST` | `/api/v1/music/*` | Поиск, радио, текущий трек, лайк, пропуск, рекомендации |
+| `GET`/`POST` | `/api/v1/speech/*` | Синтез речи (TTS), распознавание (STT), симуляция вейкворда |
+| `GET`/`POST` | `/api/v1/bluetooth/*` | Статус адаптера, поиск, сопряжение и подключение A2DP |
+| `GET`/`POST` | `/api/v1/network/*` | Статус сети, сканирование Wi-Fi, подключение, Setup AP |
+| `GET`/`POST` | `/api/v1/vpn/*` | Статус туннеля, статистика трафика, подключение, VLESS URI |
+| `GET` | `/api/v1/events` | **WebSocket** шина событий реального времени |
+
+---
+
+## 📚 Документация проекта
+
+| Документ | Описание |
+|---|---|
+| [`AGENTS.md`](AGENTS.md) | Системные правила и регламент разработки для ИИ-агентов |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Архитектура монолита, взаимодействие подсистем и диаграммы C4 |
+| [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md) | Технические требования, характеристики оборудования и показатели SLA |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | Журнал архитектурных решений (ADR — Architecture Decision Records) |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Дорожная карта разработки, прогресс этапов 1–8 и бэклог |
+| [`docs/API.md`](docs/API.md) | Полная спецификация REST и WebSocket API с примерами |
+| [`docs/HARDWARE.md`](docs/HARDWARE.md) | Схемотехника, распиновка пинов, питание и акустика GT-112 |
+| [`docs/SECURITY.md`](docs/SECURITY.md) | Модель угроз, политика изоляции AI и маскирование секретов |
+
