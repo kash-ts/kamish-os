@@ -47,32 +47,32 @@
 
 ```
 kamish-os/
-├── backend/                  # Rust бэкенд (модульный монолит)
-│   ├── Cargo.toml
-│   ├── src/
-│   │   ├── main.rs           # Точка входа, graceful shutdown
-│   │   ├── lib.rs            # Модульный корень
-│   │   ├── ai/               # AI Orchestrator, CLI клиент, Mock клиент, 14 Tools
-│   │   ├── api/              # Axum REST обработчики & WebSocket шина
-│   │   ├── audio/            # OutputManager, Safe Ceiling, Alert tone гонг
-│   │   ├── bluetooth/        # BlueZ / bluetoothctl контроллер
-│   │   ├── common/           # Ошибки, AppState, макросы
-│   │   ├── config/           # Настройки окружения
-│   │   ├── database/         # SQLite пул, миграции
-│   │   ├── music/            # MPV контроллер, радио, рекомендации, история
-│   │   ├── network/          # Wi-Fi сканер, подключение, Setup AP
-│   │   ├── scheduler/        # Планировщик будильников/напоминаний, chrono-tz
-│   │   ├── speech/           # VAD, WakeWord, STT, TTS, offline synthesizer
-│   │   ├── system/           # Аппаратная телеметрия, сенсоры процессора, ReSpeaker
-│   │   └── vpn/              # VLESS Reality менеджер с маскированием
-│   └── tests/                # 10 файлов интеграционных тестов (70 тестов)
-├── frontend/                 # Клиентская веб-панель
-│   ├── package.json
-│   ├── src/
-│   │   ├── api/              # Строго типизированный API-клиент ко всем эндпоинтам
-│   │   ├── components/       # UI компоненты (Navbar, Card, Modal, AiAssistant и др.)
-│   │   ├── pages/            # Dashboard, Music, Alarms, Diagnostics, Settings
-│   │   └── types/            # TypeScript контракты моделей данных
+├── Cargo.toml                # Корневой Cargo Workspace
+├── crates/
+│   ├── kamish-ipc/           # Общая библиотека IPC протокола (Length-delimited JSON framing, IpcClient / IpcServer)
+│   ├── kamish-core/          # Автономный демон ядра колонки (24/7, аппаратный слой, аудио, речь, планировщик, core.db)
+│   │   ├── src/
+│   │   │   ├── ai/           # AI Orchestrator, CLI клиент, Mock клиент, 14 Tools
+│   │   │   ├── audio/        # OutputManager, Safe Ceiling (<=85%), Alert tone гонг
+│   │   │   ├── bluetooth/    # BlueZ / bluetoothctl контроллер
+│   │   │   ├── config/       # Настройки окружения ядра
+│   │   │   ├── database/     # SQLite WAL пул, schema.sql
+│   │   │   ├── music/        # Lavalink v4 / MPV контроллер, радио, рекомендации
+│   │   │   ├── network/      # Wi-Fi сканер, подключение, Setup AP
+│   │   │   ├── scheduler/    # Планировщик будильников/напоминаний, chrono-tz
+│   │   │   ├── speech/       # VAD, WakeWord, STT, TTS, capture pipeline
+│   │   │   ├── system/       # Аппаратная телеметрия, сенсоры процессора, ReSpeaker
+│   │   │   └── vpn/          # VLESS Reality менеджер с маскированием
+│   │   └── tests/            # Интеграционные тесты ядра (telemetry, scheduler, speech, pipeline)
+│   └── kamish-web/           # Легковесный бэкенд веб-панели (Axum :8080, Argon2id auth, web.db, IPC proxying)
+│       ├── src/
+│       │   ├── api/          # Axum REST обработчики, раздача статики SPA, WS стриминг
+│       │   ├── auth/         # Аутентификация, сессии, Argon2id, web.db репозиторий
+│       │   └── state.rs      # WebState с IpcClient для проксирования в kamish-core
+├── backend/                  # Совместимый метапакет-фасад
+├── frontend/                 # Клиентская веб-панель (React 19 + TypeScript + Tailwind)
+├── database/                 # Единая схема SQLite (schema.sql)
+└── deploy/                   # Systemd сервисы (kamish-core.service, kamish-web.service, kamish.service)
 │   └── dist/                 # Скомпилированный статический бандл
 ├── database/                 # База данных SQLite
 │   └── schema.sql            # Единая схема БД (таблицы, индексы, PRAGMA user_version)
