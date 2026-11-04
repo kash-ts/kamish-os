@@ -46,8 +46,8 @@ CREATE TABLE IF NOT EXISTS alarms (
     id TEXT PRIMARY KEY,
     time TEXT NOT NULL,
     timezone TEXT NOT NULL DEFAULT 'UTC',
-    recurrence TEXT NOT NULL DEFAULT 'once',
-    label TEXT NOT NULL DEFAULT '',
+    recurrence TEXT DEFAULT 'once',
+    label TEXT DEFAULT '',
     enabled BOOLEAN NOT NULL DEFAULT 1,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
@@ -81,7 +81,7 @@ CREATE TABLE IF NOT EXISTS music_tracks (
     artist TEXT NOT NULL,
     duration_secs INTEGER NOT NULL DEFAULT 0,
     source TEXT NOT NULL DEFAULT 'local',
-    uri TEXT NOT NULL,
+    uri TEXT NOT NULL DEFAULT '',
     extra_json TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -97,6 +97,7 @@ CREATE TABLE IF NOT EXISTS music_likes (
 CREATE TABLE IF NOT EXISTS music_skips (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     track_id TEXT NOT NULL,
+    position_secs INTEGER NOT NULL DEFAULT 0,
     skipped_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
