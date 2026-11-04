@@ -1,0 +1,56 @@
+[Unit]
+Description=Kamish OS Core Daemon
+After=network.target sound.target bluetooth.target
+Wants=network.target sound.target bluetooth.target
+
+[Service]
+Type=simple
+User=kamish
+Group=kamish
+SupplementaryGroups=audio dialout netdev bluetooth video
+
+WorkingDirectory=/opt/kamish
+ExecStart=/opt/kamish/bin/kamish
+
+Restart=on-failure
+RestartSec=5s
+TimeoutStopSec=10s
+
+# Environment configuration
+EnvironmentFile=-/etc/kamish/kamish.env
+Environment="RUST_LOG=info"
+Environment="HOST=0.0.0.0"
+Environment="PORT=8080"
+Environment="DATABASE_URL=sqlite:///var/lib/kamish/kamish_core.db"
+Environment="STATIC_DIR=/opt/kamish/frontend"
+
+# System and resource hardening
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=false
+MemoryDenyWriteExecute=false
+
+# Writable state directories
+ReadWritePaths=/var/lib/kamish /var/log/kamish /tmp /run/kamish
+
+# Hardware device permissions (Audio ALSA, USB ReSpeaker XVF3800, Bluetooth)
+DevicePolicy=closed
+DeviceAllow=/dev/snd/* rw
+DeviceAllow=/dev/bus/usb/* rw
+DeviceAllow=/dev/rfkill rw
+
+# Capabilities required for low-latency audio and network control
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_SYS_NICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+
+# Memory and CPU limits
+MemoryHigh=150M
+MemoryMax=250M
+CPUWeight=100
+
+[Install]
+WantedBy=multi-user.target
