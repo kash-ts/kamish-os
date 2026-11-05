@@ -29,17 +29,17 @@
 ## 2. Базовые принципы и правила ИИ-агента (Core Invariants)
 
 ### 🔴 Категорически запрещено (NEVER)
-1. **Никаких утечек секретов:** Никогда не хардкодить, не логировать (stdout/stderr/tracing) и не отдавать во фронтенд/API приватные ключи VLESS, пароли Wi-Fi сетей (PSK), cookies или токены авторизации. Всегда маскировать секреты.
+1. **Никаких утечек секретов:** Никогда не хардкодить, не логировать (stdout/stderr/tracing) и не отдавать в SPA-интерфейс/API приватные ключи VLESS, пароли Wi-Fi сетей (PSK), cookies или токены авторизации. Всегда маскировать секреты.
 2. **Никаких «галлюцинаций» аппаратуры:** Запрещено выдумывать успешные ответы отсутствующего физического железа. Если драйвер или плата недоступны в dev-окружении (x86_64), использовать строгие мок-интерфейсы (`MockAiClient`, `MockMpvPlayer`, симуляция VAD/вейкворда) и явно фиксировать ограничения в документации.
 3. **Никаких обходов Tool Registry:** Модель ИИ-оркестратора **не имеет** прямого доступа к Shell, системным файлам или секретам хоста. Вся работа с колонкой ведётся строго через типизированные инструменты (14 tools).
 4. **Никакого ухудшения тестов:** Запрещено отключать, комментировать (`#[ignore]`) или удалять существующие тесты для создания иллюзии работоспособности. Все тесты должны проходить зелёным цветом.
-5. **Никакого визуального мусора («AI Slop»):** Фронтенд должен соответствовать правилам `kill-ai-slop`: строгий, функциональный дизайн без фиолетовых «нейросетевых» градиентов, смайликов в заголовках и избыточных декораций.
+5. **Никакого визуального мусора («AI Slop»):** SPA-интерфейс должен соответствовать правилам `kill-ai-slop`: строгий, функциональный дизайн без фиолетовых «нейросетевых» градиентов, смайликов в заголовках и избыточных декораций.
 6. **Запрет на облачные сервисы для STT и TTS:** Распознавание речи (STT) и синтез голоса (TTS) обязаны выполняться **строго локально на устройстве** (Vosk, Piper, RHVoice, автономный WAV-генератор). Категорически запрещено использовать сторонние облачные Whisper или Cloud TTS API. При этом языковая модель (LLM через процесс Antigravity CLI `agy`) и стриминг музыки (YouTube Music) работают с облаком — прямое подключение облачных REST API в обход CLI `agy` запрещено.
 
 ### 🟢 Обязательно к исполнению (ALWAYS)
 1. **Принцип Offline-First:** Базовые функции устройства (будильники, напоминания, локальный звук, системные статусы, веб-панель) обязаны работать автономно без интернета и облачного ИИ.
 2. **Защита акустики (Safe Volume Ceiling):** Программный максимум громкости зафиксирован на уровне **85%**. Не допускать превышения этого значения в коде аудио-менеджера.
-3. **Холодный запуск и экономия памяти:** Потребление памяти бэкендом в состоянии покоя не должно превышать 60 МБ RSS. Использовать SQLite в режиме WAL с пулом соединений SQLx.
+3. **Холодный запуск и экономия памяти:** Потребление памяти сервисами в состоянии покоя не должно превышать 60 МБ RSS. Использовать SQLite в режиме WAL с пулом соединений SQLx.
 4. **Сохранение целостности кода:** Сохранять существующие комментарии, документацию и форматирование. Делать точечные, атомарные изменения.
 
 ---
@@ -57,17 +57,17 @@
 ### Команды верификации качества:
 После внесения любых изменений в кодовую базу агент обязан выполнить:
 ```bash
-# 1. Проверка синтаксиса и типов бэкенда
-cargo check --manifest-path backend/Cargo.toml
+# 1. Проверка синтаксиса и типов Rust-воркспейса
+cargo check --workspace --all-targets
 
 # 2. Прогон всех модульных и интеграционных тестов
-cargo test --manifest-path backend/Cargo.toml
+cargo test --workspace
 
 # 3. Проверка форматирования кода Rust
-cargo fmt --manifest-path backend/Cargo.toml -- --check
+cargo fmt --all -- --check
 
-# 4. Проверка сборки фронтенда (если затронут frontend)
-cd frontend && npm run build
+# 4. Проверка сборки SPA-интерфейса (если затронут `crates/kamish-web/frontend/`)
+cd crates/kamish-web/frontend && npm run build
 ```
 
 > [!IMPORTANT]
@@ -79,18 +79,19 @@ cd frontend && npm run build
 
 | Подсистема | Путь в проекте | Ключевые технологии и особенности |
 |---|---|---|
-| **Ядро Backend** | `backend/src/` | Rust 2021, Tokio, Axum 0.8, Tracing |
-| **Аутентификация** | `backend/src/auth/` | Хэширование Argon2id, сессии SQLite, cookie `kamish_session`, Middleware блокировки |
-| **Мастер настройки** | `backend/src/setup/` | Setup Wizard (5 этапов), хранение в `device_state`, диагностические пробы, WS события |
-| **База данных** | `backend/src/database/`, `database/schema.sql` | SQLite WAL, единая схема `schema.sql` (PRAGMA user_version) |
-| **Планировщик** | `backend/src/scheduler/` | `SchedulerEngine`, поддержка Cron-подобных правил, Timezone, SQLite репозиторий |
-| **Аудио-алерты** | `backend/src/audio/alert.rs` | Автономный математический синтезатор WAV-тонов (без внешних зависимостей) |
-| **AI-оркестратор** | `backend/src/ai/` | Antigravity CLI процесс, сессии диалогов, реестр из 14 инструментов, `MockAiClient` |
-| **Мультимедиа** | `backend/src/music/` | Headless MPV через IPC UNIX-сокет, радио, рекомендации YouTube Music, mock-фоллбэк |
-| **Речь (Speech)** | `backend/src/speech/` | VAD на чистом Rust (RMS + ZCR), споттер ключевых слов, модульные STT/TTS |
-| **Системный стек** | `backend/src/system/` | Bluetooth A2DP (BlueZ), Wi-Fi (nmcli), Setup AP, Happ VLESS Reality, шина событий WS |
-| **Аппаратура** | `backend/src/system/hardware.rs` | Мониторинг процессора (`sysfs`), троттлинг ($\ge 80^\circ\text{C}$), лимитер громкости 85% |
-| **Фронтенд** | `frontend/src/` | React 19, TypeScript, Vite, Tailwind CSS, отдача через Axum `ServeDir` |
+| **Домен (ядро)** | `crates/kamish-core/src/` | Rust, Tokio, Tracing; прикладная логика без HTTP |
+| **HTTP/WS + аутентификация** | `crates/kamish-web/src/` | Axum 0.8, роуты `api/`, Argon2id, сессии SQLite, cookie `kamish_session`, middleware |
+| **Мастер настройки** | `crates/kamish-core/src/setup/`, `crates/kamish-web/src/api/setup.rs` | Setup Wizard (5 этапов), хранение в `device_state`, диагностические пробы, WS события |
+| **База данных** | `crates/kamish-core/src/database/`, `crates/kamish-web/src/database.rs` | SQLite WAL, единая схема (PRAGMA user_version), пул SQLx |
+| **Планировщик** | `crates/kamish-core/src/scheduler/` | `SchedulerEngine`, поддержка Cron-подобных правил, Timezone, SQLite репозиторий |
+| **Аудио-алерты** | `crates/kamish-core/src/audio/alert.rs` | Автономный математический синтезатор WAV-тонов (без внешних зависимостей) |
+| **AI-оркестратор** | `crates/kamish-core/src/ai/` | Antigravity CLI процесс, сессии диалогов, реестр из 14 инструментов, `MockAiClient` |
+| **Мультимедиа** | `crates/kamish-core/src/music/` | Headless MPV через IPC UNIX-сокет, радио, рекомендации YouTube Music, mock-фоллбэк |
+| **Речь (Speech)** | `crates/kamish-core/src/speech/` | VAD на чистом Rust (RMS + ZCR), споттер ключевых слов, модульные STT/TTS |
+| **Системный стек** | `crates/kamish-core/src/{system,network,bluetooth,vpn}/` | Bluetooth A2DP (BlueZ), Wi-Fi (nmcli), Setup AP, Happ VLESS Reality, шина событий WS |
+| **Аппаратура** | `crates/kamish-core/src/system/hardware.rs` | Мониторинг процессора (`sysfs`), троттлинг ($\ge 80^\circ\text{C}$), лимитер громкости 85% |
+| **IPC-контракт** | `crates/kamish-ipc/src/`, `crates/kamish-core/src/ipc_server.rs` | Общий протокол/кодек сообщений между процессами Kamish |
+| **SPA-интерфейс** | `crates/kamish-web/frontend/src/` | React 19, TypeScript, Vite, Tailwind CSS, отдача через Axum `ServeDir` |
 | **Развёртывание** | `deploy/`, `firmware/` | Сборка прошивки Kamish Linux (Buildroot), udev-правила для XVF3800, systemd служба |
 
 ---

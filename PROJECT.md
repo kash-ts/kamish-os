@@ -1,8 +1,8 @@
 # Project: KAMISH Web Panel Overhaul & Authentication
 
 ## Architecture
-- **Backend**: Rust 2021, Tokio, Axum 0.8, SQLx SQLite WAL, Argon2id password hashing, native HTTP cookie/header session management.
-- **Frontend**: React 19, TypeScript, Vite, Tailwind CSS, Lucide icons, строгий светлый минималистичный дизайн (темная тема запрещена), нативный WebSocket клиент.
+- **Сервисный слой (Rust)**: Rust 2021, Tokio, Axum 0.8, SQLx SQLite WAL, Argon2id password hashing, native HTTP cookie/header session management.
+- **SPA-интерфейс (`crates/kamish-web/frontend/`)**: React 19, TypeScript, Vite, Tailwind CSS, Lucide icons, строгий светлый минималистичный дизайн (темная тема запрещена), нативный WebSocket клиент.
 - **Data Flow**:
   - `POST /api/v1/auth/login` -> Argon2id verification -> SQLite `auth_sessions` -> returns session token & Set-Cookie.
   - `Axum Middleware` -> validates token on `/api/v1/*` routes; enforces `must_change_password` (blocks with 403 `PASSWORD_CHANGE_REQUIRED`).
@@ -11,7 +11,7 @@
   - `POST /api/v1/setup/step` -> saves progress in `device_state` -> emits `setup_step_updated` on WebSocket.
   - `POST /api/v1/setup/complete` -> marks `setup:completed = true` in `device_state` -> emits `setup_completed` on WebSocket.
   - `POST /api/v1/setup/simulate-degradation` -> controlled degradation injection for zero-mock testing.
-  - `Frontend`: SPA со светлой темой (без темной темы), экранами `/login`, forced `/change-password`, пошаговым `/setup` и фиксированным сайдбаром (9 разделов).
+  - SPA-интерфейс: светлая тема (без темной темы), экраны `/login`, forced `/change-password`, пошаговый `/setup` и фиксированный сайдбар (9 разделов).
 
 ## Feature Inventory
 | # | Feature | Description | Milestone | Source |
@@ -31,33 +31,37 @@
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
 |---|------|-------|-------------|--------|
-| M1 | Backend Auth Subsystem | Cargo `argon2`, `database/schema.sql`, `backend/src/auth/`, `/api/v1/auth/*`, middleware | none | COMPLETED |
-| M2 | Backend Setup Wizard | `SetupRepository`, `/api/v1/setup/*`, diagnostic probes, WS events | none | COMPLETED |
-| M3 | Frontend Application | Светлая минималистичная тема (темная тема запрещена), Login, Change Password, Setup Wizard, 9 разделов | none | COMPLETED |
+| M1 | Auth Subsystem (kamish-web) | Cargo `argon2`, `database/schema.sql`, `crates/kamish-web/src/auth/`, `/api/v1/auth/*`, middleware | none | COMPLETED |
+| M2 | Setup Wizard (kamish-web) | `SetupRepository`, `/api/v1/setup/*`, diagnostic probes, WS events | none | COMPLETED |
+| M3 | SPA-интерфейс (kamish-web) | Светлая минималистичная тема (темная тема запрещена), Login, Change Password, Setup Wizard, 9 разделов | none | COMPLETED |
 | M4 | Integration & Quality Gates | End-to-end verification, tests, forensic audit | M1, M2, M3 | IN_PROGRESS |
 
 ## Code Layout & Write Boundaries
-- **Worker 1 (Backend Auth - M1)** exclusively owns:
-  - `backend/Cargo.toml`
-  - `database/schema.sql`
-  - `backend/src/auth/`
-  - `backend/src/api/auth.rs`
-  - `backend/tests/api_auth_test.rs`
-- **Worker 2 (Backend Setup Wizard - M2)** exclusively owns:
-  - `backend/src/setup/`
-  - `backend/src/api/setup.rs`
-  - `backend/tests/api_setup_test.rs`
-- **Worker 3 (Frontend Minimalist Overhaul - M3)** exclusively owns:
-  - `frontend/src/` (App.tsx, components/, pages/, api/, styles/)
-  - `frontend/index.html`
+> Пути приведены к актуальной раскладке Cargo-воркспейса: серверные подсистемы
+> живут в `crates/kamish-core/` и `crates/kamish-web/`, а исходники веб-панели —
+> в `crates/kamish-web/frontend/`.
 
-Note on shared backend files:
-`backend/src/api/mod.rs`, `backend/src/common/mod.rs`, and `backend/src/database/mod.rs`:
+- **Worker 1 (Auth - M1)** exclusively owns:
+  - `crates/kamish-web/Cargo.toml`
+  - `database/schema.sql`
+  - `crates/kamish-web/src/auth/`
+  - `crates/kamish-web/src/api/auth.rs`
+- **Worker 2 (Setup Wizard - M2)** exclusively owns:
+  - `crates/kamish-core/src/setup/`
+  - `crates/kamish-web/src/api/setup.rs`
+  - `crates/kamish-core/tests/`
+- **Worker 3 (SPA-интерфейс, минималистичный оверхаул — M3)** exclusively owns:
+  - `crates/kamish-web/frontend/src/` (App.tsx, components/, pages/, api/, styles/)
+  - `crates/kamish-web/frontend/index.html`
+
+Note on shared crate files (общие точки сборки `kamish-web` / `kamish-core`):
+`crates/kamish-web/src/api/mod.rs`, `crates/kamish-core/src/common/mod.rs`, and
+`crates/kamish-core/src/database/mod.rs` (+ `crates/kamish-web/src/database.rs`):
 M1 wires auth routes & AppState. M2 wires setup routes.
-To avoid merge collisions, Worker 1 (Backend Lead) can implement both M1 (Auth) and M2 (Setup Wizard API) in clean sequential modules, or Worker 1 focuses on Auth + Setup API while Worker 3 simultaneously focuses on Frontend UI!
-Wait, that is an optimal architectural pattern:
-- **Backend Specialist Worker**: Implements R1 (Argon2 Auth, sessions, middleware) AND R2 (Setup Wizard, persistence, diagnostic probes). All backend files are cohesively compiled and tested together (`cargo check`, `cargo test`) without race conditions on `backend/src/api/mod.rs`!
-- **Frontend Specialist Worker**: Implements R3 (D-Link monochrome design, Login, Change Password, Setup Wizard with recovery, 9 sidebar sections, real API client and WS hooks, kill-ai-slop compliance, `npm run build`). Runs completely in parallel on `frontend/src/`!
+To avoid merge collisions, Worker 1 (Service Layer Lead) can implement both M1 (Auth) and M2 (Setup Wizard API) in clean sequential modules, or Worker 1 focuses on Auth + Setup API while Worker 3 simultaneously focuses on the SPA-интерфейс.
+Rationale for this split:
+- **Service Layer Specialist Worker**: Implements R1 (Argon2 Auth, sessions, middleware) AND R2 (Setup Wizard, persistence, diagnostic probes). All server-side files are cohesively compiled and tested together (`cargo check`, `cargo test`) without race conditions on `crates/kamish-web/src/api/mod.rs`.
+- **SPA Specialist Worker**: Implements R3 (D-Link monochrome design, Login, Change Password, Setup Wizard with recovery, 9 sidebar sections, real API client and WS hooks, kill-ai-slop compliance, `npm run build`). Runs completely in parallel on `crates/kamish-web/frontend/src/`.
 
 ## Interface Contracts
 ### Auth API Contract

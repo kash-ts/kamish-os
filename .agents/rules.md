@@ -6,7 +6,7 @@
 - Final response must be minimal: no filler phrases, no restating the question, no "конечно", "вот что нужно сделать", no unnecessary markdown headers/bullets unless content genuinely requires structure.
 - Answer directly with the result or the question. No preamble, no summary at the end unless asked.
 
-## Backend Comment Standards
+## Core Comment Standards
 
 1. Language: English only (comments, TSDoc, internal log messages). Zero Cyrillic in code comments.
 2. Content: Explain "why", invariants, edge cases, and concurrency guarantees. Never restate self-evident code.
