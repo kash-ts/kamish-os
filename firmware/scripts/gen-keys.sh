@@ -23,11 +23,11 @@ fi
 
 # 1. Generate Development CA
 openssl req -x509 -newkey rsa:4096 -nodes -keyout "${CA_KEY}" -out "${CA_CERT}" \
-    -subj "/O=Kamish Smart Speaker/CN=Kamish Development Root CA" -days 3650
+    -subj "/O=Kamish OS/CN=Kamish Development Root CA" -days 3650
 
 # 2. Generate Development Signing Key & CSR
 openssl req -newkey rsa:2048 -nodes -keyout "${SIGN_KEY}" -out "${KEYS_DIR}/development-1.csr" \
-    -subj "/O=Kamish Smart Speaker/CN=Kamish Release Signer"
+    -subj "/O=Kamish OS/CN=Kamish Release Signer"
 
 # 3. Sign development certificate with CA
 openssl x509 -req -in "${KEYS_DIR}/development-1.csr" -CA "${CA_CERT}" -CAkey "${CA_KEY}" \
@@ -37,7 +37,7 @@ openssl x509 -req -in "${KEYS_DIR}/development-1.csr" -CA "${CA_CERT}" -CAkey "$
 cp "${CA_CERT}" "${KEYRING}"
 
 # Also copy keyring into Buildroot overlay
-OVERLAY_RAUC_DIR="${SCRIPT_DIR}/../buildroot-external-kamish/board/kamish/orangepi-zero3/overlay/etc/rauc"
+OVERLAY_RAUC_DIR="${SCRIPT_DIR}/../buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/rauc"
 mkdir -p "${OVERLAY_RAUC_DIR}"
 cp "${KEYRING}" "${OVERLAY_RAUC_DIR}/keyring.pem"
 

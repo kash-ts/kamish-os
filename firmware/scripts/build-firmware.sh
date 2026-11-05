@@ -34,5 +34,5 @@ if command -v docker >/dev/null 2>&1; then
     echo "=== Build finished! Output images available in firmware/output/images/ ==="
 else
     echo "Docker is not available. Please install Docker or run Buildroot natively on an x86_64 Linux host."
-    echo "Command: make BR2_EXTERNAL=${FIRMWARE_DIR}/buildroot-external-kamish kamish_orangepi_zero3_defconfig && make"
+    echo "Command: make BR2_EXTERNAL=${FIRMWARE_DIR}/buildroot-external-kamish kamish_orangepi_4_pro_defconfig && make"
 fi

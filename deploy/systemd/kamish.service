@@ -1,5 +1,5 @@
 [Unit]
-Description=Kamish OS Smart Speaker (Core & Web Stack)
+Description=Kamish OS (Core & Web Stack)
 Wants=kamish-core.service kamish-web.service
 After=kamish-core.service kamish-web.service
 
