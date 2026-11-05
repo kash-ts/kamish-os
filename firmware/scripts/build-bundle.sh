@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEYS_DIR="${SCRIPT_DIR}/../keys"
-BOARD_DIR="${SCRIPT_DIR}/../buildroot-external-kamish/board/kamish/orangepi-zero3"
+BOARD_DIR="${SCRIPT_DIR}/../buildroot-external-kamish/board/kamish/orangepi-4-pro"
 VERSION="${1:-1.0.0}"
 BUILD_ID="${2:-$(date +%Y%m%d%H%M)}"
 INPUT_ROOTFS="${3:-}"

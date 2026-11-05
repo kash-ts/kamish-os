@@ -1,5 +1,5 @@
 [Unit]
-Description=Kamish OS Web Panel Backend
+Description=Kamish OS Web Panel Service
 After=network.target kamish-core.service
 Requires=kamish-core.service
 
@@ -22,7 +22,7 @@ Environment="HOST=0.0.0.0"
 Environment="PORT=8080"
 Environment="WEB_DATABASE_URL=sqlite:///var/lib/kamish/web.db"
 Environment="KAMISH_IPC_SOCKET=/run/kamish/core.sock"
-Environment="STATIC_DIR=/opt/kamish/frontend"
+Environment="STATIC_DIR=/opt/kamish/dist"
 
 # System and resource hardening
 NoNewPrivileges=true
