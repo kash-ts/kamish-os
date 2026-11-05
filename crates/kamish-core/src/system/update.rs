@@ -97,7 +97,7 @@ pub fn inspect_bundle(file_path: &Path) -> Result<UpdateBundleInfo, String> {
         if out.status.success() {
             let info_str = String::from_utf8_lossy(&out.stdout);
             let mut version = "1.0.0".to_string();
-            let mut compatible = "kamish-orangepi-zero3".to_string();
+            let mut compatible = "kamish-orangepi-4-pro".to_string();
             let mut description = "KAMISH OS Update".to_string();
 
             for line in info_str.lines() {
@@ -136,7 +136,7 @@ pub fn inspect_bundle(file_path: &Path) -> Result<UpdateBundleInfo, String> {
     }
 
     Ok(UpdateBundleInfo {
-        compatible: "kamish-orangepi-zero3".to_string(),
+        compatible: "kamish-orangepi-4-pro".to_string(),
         version: "1.0.1".to_string(),
         description: "KAMISH OS Firmware Update (A/B)".to_string(),
         build_id: "dev-verified".to_string(),

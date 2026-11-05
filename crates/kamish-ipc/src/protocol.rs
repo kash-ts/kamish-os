@@ -241,3 +241,22 @@ pub enum CoreEvent {
         payload: serde_json::Value,
     },
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_socket_path_constants() {
+        assert_eq!(DEFAULT_SOCKET_PATH, "/run/kamish/core.sock");
+        assert_eq!(FALLBACK_SOCKET_PATH, "/tmp/kamish_core.sock");
+    }
+
+    #[test]
+    fn test_resolve_socket_path_honours_env_override() {
+        // `KAMISH_CORE_SOCK` has the highest priority over directory probing.
+        std::env::set_var("KAMISH_CORE_SOCK", "/custom/kamish.sock");
+        assert_eq!(resolve_socket_path(), "/custom/kamish.sock");
+        std::env::remove_var("KAMISH_CORE_SOCK");
+    }
+}

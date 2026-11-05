@@ -90,13 +90,13 @@ async fn test_respeaker_detection_with_sources() {
 async fn test_board_model_detection() {
     set_audio_muted(true);
 
-    let dt = Some("OrangePi Zero3\0");
+    let dt = Some("OrangePi 4 Pro\0");
     let model = detect_board_model_from_sources(dt, None);
-    assert_eq!(model, "OrangePi Zero3");
+    assert_eq!(model, "OrangePi 4 Pro");
 
-    let os_release = "NAME=\"Buildroot\"\nBOARD_NAME=\"OrangePi Zero 3\"\n";
+    let os_release = "NAME=\"Buildroot\"\nBOARD_NAME=\"OrangePi 4 Pro\"\n";
     let model2 = detect_board_model_from_sources(None, Some(os_release));
-    assert_eq!(model2, "OrangePi Zero 3");
+    assert_eq!(model2, "OrangePi 4 Pro");
 
     let generic = detect_board_model_from_sources(None, None);
     assert!(generic.contains("Generic Linux"));
