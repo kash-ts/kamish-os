@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """vosk-transcriber — CLI-обёртка для совместимости с VoskSttProvider.
 
-`VoskSttProvider` (backend/src/speech/stt/vosk.rs) вызывает внешний бинарник так:
+`VoskSttProvider` (crates/kamish-core/src/speech/stt/vosk.rs) вызывает внешний бинарник так:
 
     vosk-transcriber -i <файл.wav> -m <путь-к-модели>
     vosk-transcriber -i <файл.wav> -l ru

@@ -11,6 +11,6 @@ services:
     working_dir: /build/buildroot
     command: >
       bash -c "
-        make BR2_EXTERNAL=/build/external kamish_orangepi_zero3_defconfig &&
+        make BR2_EXTERNAL=/build/external kamish_orangepi_4_pro_defconfig &&
         make -j$$(nproc)
       "

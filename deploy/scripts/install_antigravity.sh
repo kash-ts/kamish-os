@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Antigravity CLI Installer / Updater for Smart Speaker (Linux ARM64 / x86_64)
+# Antigravity CLI Installer / Updater for Kamish OS (Linux ARM64 / x86_64)
 # ==============================================================================
 set -euo pipefail
 
@@ -24,7 +24,7 @@ esac
 
 echo "[INFO] Detecting latest Antigravity CLI release for ${ARCH}..."
 API_URL="https://api.github.com/repos/${REPO}/releases/latest"
-RELEASE_JSON="$(curl -sSL -H "User-Agent: smart-speaker-installer" "${API_URL}")"
+RELEASE_JSON="$(curl -sSL -H "User-Agent: kamish-installer" "${API_URL}")"
 
 DOWNLOAD_URL="$(echo "${RELEASE_JSON}" | grep "browser_download_url" | grep "${ASSET_PATTERN}" | cut -d '"' -f 4 | head -n 1)"
 TAG_NAME="$(echo "${RELEASE_JSON}" | grep "tag_name" | cut -d '"' -f 4 | head -n 1)"
