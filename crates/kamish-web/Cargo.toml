@@ -3,7 +3,7 @@ name = "kamish-web"
 version = "0.1.0"
 edition = "2021"
 authors = ["Kamish Team"]
-description = "Web panel backend and HTTP API gateway for Kamish OS"
+description = "Web panel service and HTTP API gateway for Kamish OS"
 
 [lib]
 name = "kamish_web"
