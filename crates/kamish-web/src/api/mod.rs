@@ -124,8 +124,9 @@ pub fn create_router(state: WebState) -> Router {
         ));
 
     // Static assets & SPA fallback
-    let frontend_dist =
-        std::env::var("FRONTEND_DIST").unwrap_or_else(|_| "frontend/dist".to_string());
+    let frontend_dist = std::env::var("FRONTEND_DIST")
+        .or_else(|_| std::env::var("STATIC_DIR"))
+        .unwrap_or_else(|_| "crates/kamish-web/frontend/dist".to_string());
     let index_html = format!("{}/index.html", frontend_dist);
     let static_service = ServeDir::new(&frontend_dist).fallback(ServeFile::new(index_html));
 
