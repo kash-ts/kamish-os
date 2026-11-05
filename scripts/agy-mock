@@ -1,7 +1,7 @@
 #!/bin/sh
 # Mock Antigravity CLI (`agy`) for offline development and automated tests.
 #
-# Emulates the CLI contract consumed by `CliAiClient` (backend/src/ai/client.rs):
+# Emulates the CLI contract consumed by `CliAiClient` (crates/kamish-core/src/ai/client.rs):
 #   agy --version                        -> prints a version line
 #   agy -p <prompt> --output-format json -> prints a JSON response with tool calls
 #

@@ -5,7 +5,7 @@
 ################################################################################
 
 KAMISH_HEALTHCHECK_VERSION = 1.0.0
-KAMISH_HEALTHCHECK_SITE = $(BR2_EXTERNAL_KAMISH_PATH)/board/kamish/orangepi-zero3/overlay
+KAMISH_HEALTHCHECK_SITE = $(BR2_EXTERNAL_KAMISH_PATH)/board/kamish/orangepi-4-pro/overlay
 KAMISH_HEALTHCHECK_SITE_METHOD = local
 
 define KAMISH_HEALTHCHECK_INSTALL_TARGET_CMDS

@@ -2,7 +2,8 @@
 """youtube-oauth — OAuth device-flow helper for the Kamish speaker.
 
 Этот помощник общается с Google по OAuth 2.0 Device Flow и используется
-бэкендом (`backend/src/music/youtube_auth.rs`) через три команды:
+сервисом `kamish-core` (`crates/kamish-core/src/music/youtube_auth.rs`) через
+три команды:
 
     youtube-oauth begin <client_id> <client_secret>   -> JSON {verification_url, user_code, ...}
     youtube-oauth finish <client_id> <client_secret> <device_code>  -> JSON с токенами

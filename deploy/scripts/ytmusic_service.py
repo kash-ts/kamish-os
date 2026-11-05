@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-YouTube Music Microservice for Kamish Smart Speaker.
+YouTube Music Microservice for Kamish OS.
 Provides JSON-RPC / CLI interface for:
 - Search songs, albums, artists
 - Rate track (LIKE / DISLIKE / INDIFFERENT)

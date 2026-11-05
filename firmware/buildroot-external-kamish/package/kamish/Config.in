@@ -8,4 +8,4 @@ config BR2_PACKAGE_KAMISH
 	select BR2_PACKAGE_SING_BOX
 	select BR2_PACKAGE_DROPBEAR
 	help
-	  KAMISH Core Smart Speaker daemon and web panel.
+	  Kamish hardware daemon (kamish-core) and web panel (kamish-web).
