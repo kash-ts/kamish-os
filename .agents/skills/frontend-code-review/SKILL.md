@@ -15,7 +15,7 @@ Supported modes:
 - **File-focused review**: inspect explicitly named files or paths.
 - **Diff/snippet review**: review pasted diffs or snippets using best-effort references.
 
-Do not use this skill for backend-only code under `api/`; use `backend-code-review` instead.
+Do not use this skill for service-layer code under `crates/kamish-core/src/` or `crates/kamish-web/src/`.
 
 ## Required Context
 

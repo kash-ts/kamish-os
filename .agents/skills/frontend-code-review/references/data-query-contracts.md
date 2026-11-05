@@ -57,7 +57,7 @@ Flag:
 
 - Treating workspace switch as ordinary CRUD invalidation when the current app flow performs server switch plus full reload.
 - Query keys that omit workspace/tenant identity when the query truly varies by workspace and no full reload boundary applies.
-- Mixing `workspace_id` and `tenant_id` without tracing the current backend/API contract.
+- Mixing `workspace_id` and `tenant_id` without tracing the current API contract.
 
 Current Dify workspace switch should be reviewed as a tenant cache boundary first.
 
