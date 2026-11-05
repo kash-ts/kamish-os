@@ -1,0 +1,12 @@
+[Unit]
+Description=Kamish OS (Core & Web Stack)
+Wants=kamish-core.service kamish-web.service
+After=kamish-core.service kamish-web.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/bin/true
+
+[Install]
+WantedBy=multi-user.target

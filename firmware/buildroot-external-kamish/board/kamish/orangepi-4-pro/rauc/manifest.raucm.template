@@ -1,0 +1,8 @@
+[package]
+name=kamish-os
+version=@VERSION@
+description=KAMISH OS A/B System Update Bundle (Orange Pi 4 Pro)
+build=@BUILD_ID@
+
+[image.rootfs]
+filename=rootfs.ext4
