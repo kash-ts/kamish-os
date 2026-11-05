@@ -8,9 +8,9 @@
 
 | Этап | Описание | Статус | Тестовое покрытие |
 |---|---|---|---|
-| **Этап 1** | Базовый Backend (Rust, Axum, Tokio, SQLx SQLite, REST API, Tracing) | ✅ **Завершён** | `api_status_test.rs`, `database/tests` |
+| **Этап 1** | Базовый сервисный слой (Rust, Axum, Tokio, SQLx SQLite, REST API, Tracing) | ✅ **Завершён** | `api_status_test.rs`, `database/tests` |
 | **Этап 2** | Scheduler & Алерты (Будильники, напоминания, временные зоны, генератор тонов) | ✅ **Завершён** | `api_alarms_test.rs`, `api_reminders_test.rs`, `scheduler_engine_test.rs` |
-| **Этап 3** | Frontend & Web UI (React 19, TypeScript, Vite, Tailwind CSS, kill-ai-slop) | ✅ **Завершён** | `frontend_serving_test.rs`, UI билд `frontend/dist` |
+| **Этап 3** | SPA-интерфейс (React 19, TypeScript, Vite, Tailwind CSS, kill-ai-slop) | ✅ **Завершён** | `frontend_serving_test.rs`, UI билд `crates/kamish-web/frontend/dist` |
 | **Этап 4** | AI Orchestrator & Tool Registry (Antigravity CLI, 14 типизированных инструментов) | ✅ **Завершён** | `api_ai_test.rs`, `ai/tools/tests` |
 | **Этап 5** | Music Subsystem (MPV IPC, Radio, yt-dlp, рекомендации YouTube Music) | ✅ **Завершён** | `api_music_test.rs`, `music/repository/tests` |
 | **Этап 6** | Speech Pipeline (VAD RMS/ZCR, Wakeword spotter, TTS генератор, STT диспатчер) | ✅ **Завершён** | `api_speech_test.rs`, `speech/vad/tests`, `speech/wakeword/tests` |
@@ -22,8 +22,8 @@
 
 ## 🔍 Детализация этапов
 
-### ✅ Этап 1: Базовый Backend
-- [x] Инициализация проекта `backend` на Rust 2021 edition.
+### ✅ Этап 1: Базовый сервисный слой
+- [x] Инициализация Rust-воркспейса (`crates/kamish-core`, `crates/kamish-web`, `crates/kamish-ipc`).
 - [x] Асинхронный HTTP сервер на базе Axum 0.8 и Tokio.
 - [x] Интеграция базы данных SQLite через SQLx c режимом WAL.
 - [x] Единая встраиваемая схема базы данных (`database/schema.sql`, отслеживание через `PRAGMA user_version`).
@@ -37,11 +37,11 @@
 - [x] Поддержка действий `snooze` (отложить) и `dismiss` (отключить).
 - [x] Автоматическое глушение звука в тестовом окружении (`IS_TEST_RUNNER`).
 
-### ✅ Этап 3: Frontend Web UI
+### ✅ Этап 3: SPA-интерфейс `kamish-web`
 - [x] Стек: React 19, TypeScript, Vite, Tailwind CSS.
 - [x] Полноценная адаптивная панель: статус, будильники, плеер, чат с ИИ, сети Wi-Fi, системная телеметрия.
 - [x] Очистка интерфейса по правилам `kill-ai-slop` (минималистичный дизайн без фиолетовых градиентов и визуального мусора).
-- [x] Встраивание раздачи статики через Axum (`frontend/dist`) с fallback на `index.html`.
+- [x] Встраивание раздачи статики через Axum (`crates/kamish-web/frontend/dist`) с fallback на `index.html`.
 
 ### ✅ Этап 4: AI Orchestrator & Tool Registry
 - [x] Интеграция с Antigravity CLI через подпроцесс с передачей структурированного JSON.
@@ -96,7 +96,7 @@
    - Проверка доступности веб-интерфейса мастера настройки на `http://192.168.4.1:8080`.
    - Проверка сценария автоматического выключения точки доступа после успешного подключения к домашнему Wi-Fi.
 2. **Переход на Lavalink v4 с плагином LavaSrc (ADR-010)**:
-   - Интеграция клиента Lavalink в бэкенд на Rust.
+   - Интеграция клиента Lavalink в `kamish-core` на Rust.
    - Подключение сервисов YouTube Music, Яндекс Музыка, SoundCloud, Spotify через единый протокол.
    - Маршрутизация запросов рекомендаций напрямую через Lavalink / YouTube Music.
 3. **CI/CD & Кросс-компиляция**:

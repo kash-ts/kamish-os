@@ -105,7 +105,7 @@
 wsl
 cd /mnt/m/Project/Kamish-os/radiant-bardeen
 export CARGO_TARGET_DIR=$HOME/.cache/kamish-target   # не в /mnt — там медленно
-cargo check --manifest-path backend/Cargo.toml
+cargo check --workspace --all-targets
 ```
 
 Выносить `CARGO_TARGET_DIR` в домашний каталог WSL обязательно: сборка в `/mnt/m/...`
@@ -251,7 +251,7 @@ Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
 [ ] cargo check — чисто, без новых предупреждений
 [ ] cargo test — все зелёные, число тестов выросло (если добавлена функциональность)
 [ ] cargo fmt --check — чисто
-[ ] npm run build (если трогал frontend)
+[ ] npm run build (если трогал `crates/kamish-web/frontend/`)
 [ ] Проверил через реальный API/CLI, а не только юнит-тестом
 [ ] Моки названы моками, флаги доступности отражают реальность
 [ ] Обновил docs/ (API.md, ARCHITECTURE.md), если изменился контракт

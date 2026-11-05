@@ -8,6 +8,23 @@
 
 Этот файл — сжатая карта состояния. Читайте его первым, диалог — как справочник деталей.
 
+> ⚠️ **Исторический документ.** Пути ниже записаны в раскладке на момент сессии
+> (`backend/`, `frontend/`). С тех пор фронтенд перенесён, а монолитный `backend/`
+> разделён на `kamish-core` + `kamish-web` (ADR-011). Актуальное соответствие:
+>
+> | В этом файле | Сейчас |
+> |---|---|
+> | `backend/src/{ai,speech,music,system,common,setup,network,audio,bluetooth,vpn,scheduler,database,config}` | `crates/kamish-core/src/…` |
+> | `backend/src/lib.rs`, `backend/src/ipc_server.rs` | `crates/kamish-core/src/…` |
+> | `backend/src/api/…`, `backend/src/auth/…` | `crates/kamish-web/src/…` |
+> | `backend/tests/` | `crates/kamish-core/tests/` |
+> | `backend/Cargo.toml` | `crates/kamish-core/Cargo.toml` / `crates/kamish-web/Cargo.toml` |
+> | `frontend/…` | `crates/kamish-web/frontend/…` |
+>
+> Живые документы с актуальными путями — [`ARCHITECTURE.md`](ARCHITECTURE.md),
+> [`PROJECT.md`](../PROJECT.md), [`ROADMAP.md`](ROADMAP.md). Этот файл не
+> переписывается, чтобы не искажать протокол прошлой сессии.
+
 ---
 
 ## 1. Аппаратура и окружение (ВАЖНО: изменилось)
