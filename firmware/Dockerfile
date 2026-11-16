@@ -34,6 +34,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unzip \
     wget \
     which \
+    flex \
+    bison \
+    zstd \
     rauc \
     openssl \
     dosfstools \
@@ -52,10 +55,17 @@ WORKDIR /build
 # Buildroot version
 ENV BUILDROOT_VERSION=2024.02.1
 
-RUN wget -q https://buildroot.org/downloads/buildroot-${BUILDROOT_VERSION}.tar.gz && \
-    tar -xzf buildroot-${BUILDROOT_VERSION}.tar.gz && \
-    mv buildroot-${BUILDROOT_VERSION} buildroot && \
-    rm buildroot-${BUILDROOT_VERSION}.tar.gz
+# Тарбол копируется из контекста (wget в контейнере ненадёжен при обрывах сети;
+# тарбол скачивается заранее скриптом scripts/fetch-buildroot.sh).
+# Дерево хранится как /build/buildroot-orig: docker-compose монтирует
+# кэш-каталог хоста на /build/buildroot, а pristine-дерево копируется туда
+# при первом запуске. Это нужно, чтобы дерево Buildroot и output/ были на
+# одной файловой системе — иначе syncconfig падает на rename() (EXDEV).
+COPY buildroot-${BUILDROOT_VERSION}.tar.gz /build/
+RUN tar -xzf /build/buildroot-${BUILDROOT_VERSION}.tar.gz && \
+    mv /build/buildroot-${BUILDROOT_VERSION} /build/buildroot-orig && \
+    rm /build/buildroot-${BUILDROOT_VERSION}.tar.gz && \
+    mkdir -p /build/buildroot
 
 WORKDIR /build/buildroot
 
