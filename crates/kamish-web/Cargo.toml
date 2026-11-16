@@ -30,7 +30,6 @@ thiserror = "2.0"
 dotenvy = "0.15"
 uuid = { version = "1.29.0", features = ["v4", "serde"] }
 argon2 = "0.5"
-rand = "0.8"
 base64 = "0.22"
 futures-util = "0.3"
 
