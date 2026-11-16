@@ -87,6 +87,7 @@ jobs:
           KAMISH_BR_DIR: ${{ github.workspace }}/buildroot-cache
         run: |
           mkdir -p ${{ github.workspace }}/buildroot-cache
+          sudo chown -R 1000:1000 ${{ github.workspace }}/buildroot-cache
           docker compose build builder
           docker compose run --rm builder
 
