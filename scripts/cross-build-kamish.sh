@@ -39,7 +39,10 @@ mkdir -p "$OUT"
 for bin in kamish-core kamish-web; do
     file="$DST/target/aarch64-unknown-linux-gnu/release/$bin"
     test -f "$file" || { echo "MISSING: $bin" >&2; exit 1; }
-    cp "$file" "$OUT/$bin"
+    # В CI DST == SRC: пропускаем копирование файла на самого себя
+    if [ "$DST" != "$SRC" ]; then
+        cp "$file" "$OUT/$bin"
+    fi
 done
 echo "=== артефакты ==="
 file "$OUT/kamish-core" "$OUT/kamish-web"
