@@ -6,11 +6,24 @@ services:
     volumes:
       - ..:/workspace:ro
       - ./buildroot-external-kamish:/build/external:ro
-      - ./output:/build/buildroot/output
-      - ./dl:/build/buildroot/dl
+      # Кэш Buildroot: в CI задаётся KAMISH_BR_DIR=<путь в workspace>, локально — WSL-каталог
+      - ${KAMISH_BR_DIR:-/home/ipoma/kamish-buildroot}:/build/buildroot
     working_dir: /build/buildroot
     command: >
       bash -c "
-        make BR2_EXTERNAL=/build/external kamish_orangepi_4_pro_defconfig &&
+        if [ ! -f /build/buildroot/Makefile ]; then
+          echo '=== первый запуск: копирую дерево Buildroot на кэш-volume' &&
+          cp -a /build/buildroot-orig/. /build/buildroot/ &&
+          echo '=== дерево скопировано';
+        fi &&
+        mkdir -p /build/kamish-src/target/aarch64-unknown-linux-gnu/release &&
+        cp -r /workspace/Cargo.toml /workspace/Cargo.lock /workspace/database /build/kamish-src/ &&
+        rsync -a --exclude node_modules /workspace/crates /build/kamish-src/ &&
+        for bin in kamish-core kamish-web; do
+          if [ -f /workspace/target/aarch64-unknown-linux-gnu/release/$$bin ]; then
+            cp /workspace/target/aarch64-unknown-linux-gnu/release/$$bin /build/kamish-src/target/aarch64-unknown-linux-gnu/release/$$bin;
+          fi;
+        done &&
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig &&
         make -j$$(nproc)
       "
