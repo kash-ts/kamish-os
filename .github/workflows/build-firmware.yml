@@ -55,6 +55,11 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y gcc-aarch64-linux-gnu libssl-dev libsqlite3-dev pkg-config
+          sudo dpkg --add-architecture arm64
+          . /etc/os-release
+          printf 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports %s main universe\ndeb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports %s-updates main universe\ndeb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports %s-security main universe\n' "$VERSION_CODENAME" "$VERSION_CODENAME" "$VERSION_CODENAME" | sudo tee /etc/apt/sources.list.d/kamish-arm64.list > /dev/null
+          sudo apt-get update -o Dir::Etc::sourcelist="sources.list.d/kamish-arm64.list" -o Dir::Etc::sourceparts="-"
+          sudo apt-get install -y libssl-dev:arm64
 
       - name: Cargo check (workspace)
         run: cargo check --workspace --all-targets
@@ -67,6 +72,9 @@ jobs:
 
       - name: Cross-build aarch64 binaries
         if: ${{ !inputs.skip_cross_build }}
+        env:
+          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR: /usr/lib/aarch64-linux-gnu
+          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR: /usr/include
         run: ./scripts/cross-build-kamish.sh
 
       - name: Build firmware via Docker Compose
