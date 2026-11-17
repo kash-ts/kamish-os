@@ -3,9 +3,11 @@ config BR2_PACKAGE_KAMISH
 	select BR2_PACKAGE_SQLITE
 	select BR2_PACKAGE_ALSA_LIB
 	select BR2_PACKAGE_ALSA_UTILS
-	select BR2_PACKAGE_MPV
 	select BR2_PACKAGE_RAUC
 	select BR2_PACKAGE_SING_BOX
 	select BR2_PACKAGE_DROPBEAR
 	help
 	  Kamish hardware daemon (kamish-core) and web panel (kamish-web).
+	  Media playback is kept optional outside the base firmware package,
+	  because the mpv subtitle stack pulls in libass/freetype/harfbuzz and
+	  breaks the Buildroot cross-toolchain in CI.
