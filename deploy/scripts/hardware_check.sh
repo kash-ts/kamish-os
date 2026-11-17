@@ -195,7 +195,9 @@ echo -e "\n${BOLD}5. SQLite Database Integrity:${NC}"
 
 DB_CANDIDATES=(
     "/var/lib/kamish/core.db"
+    "$(dirname "$0")/../../database/kamish_core.db"
     "$(dirname "$0")/../../kamish_core.db"
+    "./database/kamish_core.db"
     "./kamish_core.db"
     "/data/kamish/kamish.db"
 )

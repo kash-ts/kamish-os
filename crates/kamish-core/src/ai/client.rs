@@ -124,7 +124,9 @@ impl CliAiClient {
         // Check fallback locations when looking for default "agy"
         if self.cli_path == "agy" {
             let candidates = [
+                Path::new("scripts/agy-mock.sh"),
                 Path::new("scripts/agy-mock"),
+                Path::new("../scripts/agy-mock.sh"),
                 Path::new("../scripts/agy-mock"),
                 Path::new("/opt/kamish/bin/agy"),
                 Path::new("/usr/local/bin/agy"),

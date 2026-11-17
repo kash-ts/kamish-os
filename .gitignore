@@ -24,6 +24,7 @@ data/
 
 # Temporary / downloads
 downloads/
+.work/
 
 # SPA interface
 crates/kamish-web/frontend/node_modules/

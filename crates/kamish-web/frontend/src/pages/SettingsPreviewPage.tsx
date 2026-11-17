@@ -810,7 +810,7 @@ export const SettingsPreviewPage: React.FC = () => {
                     {/* Presets */}
                     <div className="flex flex-wrap gap-2 pt-1">
                       {[
-                        { label: 'Тестовый эмулятор', path: 'scripts/agy-mock' },
+                        { label: 'Тестовый эмулятор', path: 'scripts/agy-mock.sh' },
                         { label: 'Штатный путь OS', path: '/opt/kamish/bin/agy' },
                         { label: 'Системный PATH', path: 'agy' },
                       ].map((preset) => (

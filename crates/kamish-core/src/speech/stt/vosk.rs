@@ -38,6 +38,10 @@ impl VoskSttProvider {
     fn find_binary() -> Option<PathBuf> {
         let candidates = [
             "vosk-transcriber",
+            "scripts/vosk-transcriber.py",
+            "scripts/vosk-transcriber",
+            "../scripts/vosk-transcriber.py",
+            "../scripts/vosk-transcriber",
             "/usr/bin/vosk-transcriber",
             "/usr/local/bin/vosk-transcriber",
         ];
@@ -84,7 +88,13 @@ impl SttProvider for VoskSttProvider {
             .await
             .map_err(|e| AppError::System(format!("Failed writing temp audio for Vosk: {e}")))?;
 
-        let mut cmd = Command::new(bin);
+        let mut cmd = if bin.extension().and_then(|ext| ext.to_str()) == Some("py") {
+            let mut c = Command::new("python3");
+            c.arg(bin);
+            c
+        } else {
+            Command::new(bin)
+        };
         cmd.arg("-i").arg(&input_path);
 
         if let Some(ref model) = self.model_path {

@@ -4,7 +4,7 @@ use crate::speech::models::{SttResult, TtsVoice, WakeWordEvent};
 /// Modular provider interface for Speech-To-Text (STT).
 #[allow(async_fn_in_trait)]
 pub trait SttProvider: Send + Sync {
-    /// Unique provider identifier (e.g. "vosk", "sherpa_onnx", "cloud_free", "mock")
+    /// Unique provider identifier (e.g. "vosk", "sherpa_onnx", "mock")
     fn name(&self) -> &str;
 
     /// Checks if this provider is ready and available on the host system
@@ -17,7 +17,7 @@ pub trait SttProvider: Send + Sync {
 /// Modular provider interface for Text-To-Speech (TTS).
 #[allow(async_fn_in_trait)]
 pub trait TtsProvider: Send + Sync {
-    /// Unique provider identifier (e.g. "piper", "rhvoice", "cloud_free", "offline_fallback")
+    /// Unique provider identifier (e.g. "piper", "rhvoice", "offline_fallback")
     fn name(&self) -> &str;
 
     /// Checks if this provider is ready and available on the host system
