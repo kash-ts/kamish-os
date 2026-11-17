@@ -1,4 +1,4 @@
-# Сборка и запись установочного образа KAMISH OS
+# Сборка и запись установочного образа KAMISH OS (microSD / eMMC / NVMe)
 
 Инструкция для Windows-хоста. Сборка идёт в WSL2 (Ubuntu), через Docker внутри WSL.
 
@@ -162,7 +162,7 @@ ls /opt/kamish/dist/     # SPA (index.html, assets)
 Workflow: [`.github/workflows/build-image.yml`](../.github/workflows/build-image.yml).
 
 ### Запуск:
-- **Вручную**: вкладка **Actions → Build Firmware SD Card Image → Run workflow** (можно выбрать сжатие: `zstd` (по умолчанию), `xz` или без сжатия).
+- **Вручную**: вкладка **Actions → Build Firmware Disk Image → Run workflow** (можно выбрать сжатие: `zstd` (по умолчанию), `xz` или без сжатия).
 - **По тегу релиза**: при публикации тега `v*` (например, `v0.1.0`) workflow автоматически прикрепляет сжатый образ, SHA256 контрольные суммы и базовый `rootfs.tar.gz` к GitHub Releases.
 
 ### Оптимизации:

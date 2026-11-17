@@ -1,10 +1,10 @@
-name: Build Firmware SD Card Image
+name: Build Firmware Disk Image
 
 on:
   workflow_dispatch:
     inputs:
       compress_format:
-        description: "Compression format for the raw image (zstd or xz)"
+        description: "Compression format for the raw disk image (zstd or xz)"
         required: false
         default: "zstd"
         type: choice
@@ -20,8 +20,8 @@ permissions:
   contents: write
 
 jobs:
-  build-sdcard-image:
-    name: Build Kamish OS SD Card Image
+  build-disk-image:
+    name: Build Kamish OS Disk Image (microSD / eMMC / NVMe)
     runs-on: ubuntu-22.04
     timeout-minutes: 180
 
@@ -107,7 +107,7 @@ jobs:
           ls -lh buildroot-cache/output/images/
           test -f buildroot-cache/output/images/kamish-sdcard.img
 
-      - name: Compress SD Card image and generate checksums
+      - name: Compress disk image and generate checksums
         working-directory: buildroot-cache/output/images
         run: |
           FORMAT="${{ github.event.inputs.compress_format || 'zstd' }}"
