@@ -22,9 +22,11 @@ services:
         cp -r /workspace/Cargo.toml /workspace/Cargo.lock /workspace/database /build/kamish-src/ &&
         rsync -a --exclude node_modules /workspace/crates /build/kamish-src/ &&
         for bin in kamish-core kamish-web; do
-          if [ -f /workspace/target/aarch64-unknown-linux-gnu/release/$$bin ]; then
-            cp /workspace/target/aarch64-unknown-linux-gnu/release/$$bin /build/kamish-src/target/aarch64-unknown-linux-gnu/release/$$bin;
+          if [ ! -s /workspace/target/aarch64-unknown-linux-gnu/release/$$bin ]; then
+            echo "Missing cross-built $$bin; refusing to reuse a stale cached firmware image" >&2;
+            exit 1;
           fi;
+          cp /workspace/target/aarch64-unknown-linux-gnu/release/$$bin /build/kamish-src/target/aarch64-unknown-linux-gnu/release/$$bin;
         done &&
         make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig &&
         make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish-dirclean &&
