@@ -68,7 +68,7 @@ jobs:
           CARGO_BUILD_TARGET: aarch64-unknown-linux-gnu
           CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
         run: |
-          cargo build --release --target aarch64-unknown-linux-gnu -p kamish-core -p kamish-web
+          cargo build --release --quiet --target aarch64-unknown-linux-gnu -p kamish-core -p kamish-web
           test -x target/aarch64-unknown-linux-gnu/release/kamish-core
           test -x target/aarch64-unknown-linux-gnu/release/kamish-web
           file target/aarch64-unknown-linux-gnu/release/kamish-core target/aarch64-unknown-linux-gnu/release/kamish-web
