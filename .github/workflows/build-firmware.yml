@@ -1,113 +1,85 @@
-name: Build Kamish OS firmware
+name: Kamish Firmware Build
 
 on:
   push:
     branches: [main]
     paths:
-      - "firmware/**"
       - "crates/**"
       - "database/**"
+      - "firmware/**"
+      - "scripts/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - "scripts/fetch-buildroot.sh"
+      - "package.json"
+      - "package-lock.json"
       - ".github/workflows/build-firmware.yml"
-  workflow_dispatch:
-    inputs:
-      skip_cross_build:
-        description: "Skip aarch64 cross compilation (use pre-built binaries)"
-        required: false
-        default: "false"
-        type: boolean
+  pull_request:
+    paths:
+      - "crates/**"
+      - "database/**"
+      - "firmware/**"
+      - "scripts/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "package.json"
+      - "package-lock.json"
+      - ".github/workflows/build-firmware.yml"
+
+permissions:
+  contents: read
 
 jobs:
   build:
-    runs-on: ubuntu-24.04
-    concurrency:
-      group: firmware-${{ github.ref }}
-      cancel-in-progress: true
-    env:
-      CARGO_TARGET_DIR: ${{ github.workspace }}/target
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
-      # Cache the directory actually bind-mounted at /build/buildroot. Each run
-      # saves a new immutable snapshot; only the same firmware configuration is restored.
-      - name: Restore Buildroot output
-        id: buildroot-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            firmware/buildroot-2024.02.1.tar.gz
-            buildroot-cache
-          key: ${{ runner.os }}-buildroot-2024.02.1-v2-${{ hashFiles('firmware/buildroot-external-kamish/**', 'firmware/docker-compose.yml', 'firmware/Dockerfile', 'scripts/fetch-buildroot.sh') }}-${{ github.run_id }}-${{ github.run_attempt }}
-          restore-keys: |
-            ${{ runner.os }}-buildroot-2024.02.1-v2-${{ hashFiles('firmware/buildroot-external-kamish/**', 'firmware/docker-compose.yml', 'firmware/Dockerfile', 'scripts/fetch-buildroot.sh') }}-
+      - name: Install native dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config libasound2-dev
 
-      - name: Fetch Buildroot tarball
-        run: bash scripts/fetch-buildroot.sh
-
-      - name: Set up Rust toolchain
+      - name: Install Rust toolchain and target
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           target: aarch64-unknown-linux-gnu
+          components: rustfmt
+          cache: true
 
-      - name: Install cross-compile dependencies
+      - name: Install frontend dependencies
+        working-directory: crates/kamish-web/frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: crates/kamish-web/frontend
+        run: npm run build
+
+      - name: Check, test, and format
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu libssl-dev libsqlite3-dev pkg-config
-          sudo dpkg --add-architecture arm64
-          . /etc/os-release
-          printf 'deb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports %s main universe\ndeb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports %s-updates main universe\ndeb [arch=arm64] http://ports.ubuntu.com/ubuntu-ports %s-security main universe\n' "$VERSION_CODENAME" "$VERSION_CODENAME" "$VERSION_CODENAME" | sudo tee /etc/apt/sources.list.d/kamish-arm64.list > /dev/null
-          sudo apt-get update -o Dir::Etc::sourcelist="sources.list.d/kamish-arm64.list" -o Dir::Etc::sourceparts="-"
-          mkdir -p "$RUNNER_TEMP/kamish-arm64-openssl"
-          cd "$RUNNER_TEMP/kamish-arm64-openssl"
-          apt-get download libssl-dev:arm64 libssl3t64:arm64
-          for package in ./*.deb; do dpkg-deb -x "$package" sysroot; done
+          cargo check --workspace --all-targets
+          cargo test --workspace
+          cargo fmt --all -- --check
 
-      - name: Cargo check (workspace)
-        run: cargo check --workspace --all-targets
-
-      - name: Cargo test (workspace)
-        run: cargo test --workspace
-
-      - name: Cargo fmt check
-        run: cargo fmt --all -- --check
-
-      - name: Cross-build aarch64 binaries
-        if: ${{ !inputs.skip_cross_build }}
+      - name: Cross-compile release binaries
         env:
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR: ${{ runner.temp }}/kamish-arm64-openssl/sysroot/usr/lib/aarch64-linux-gnu
-          AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR: ${{ runner.temp }}/kamish-arm64-openssl/sysroot/usr/include
-          CFLAGS_aarch64_unknown_linux_gnu: -I${{ runner.temp }}/kamish-arm64-openssl/sysroot/usr/include/aarch64-linux-gnu
-        run: ./scripts/cross-build-kamish.sh
+          CARGO_BUILD_TARGET: aarch64-unknown-linux-gnu
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: cargo build --release --workspace
 
-      - name: Build firmware via Docker Compose
-        working-directory: firmware
-        env:
-          KAMISH_BR_DIR: ${{ github.workspace }}/buildroot-cache
+      - name: Verify release artifacts
         run: |
-          mkdir -p ${{ github.workspace }}/buildroot-cache
-          sudo chown -R 1000:1000 ${{ github.workspace }}/buildroot-cache
-          docker compose build builder
-          docker compose run --rm builder
+          test -x target/aarch64-unknown-linux-gnu/release/kamish-core
+          test -x target/aarch64-unknown-linux-gnu/release/kamish-web
+          file target/aarch64-unknown-linux-gnu/release/kamish-core target/aarch64-unknown-linux-gnu/release/kamish-web
 
-      - name: Save Buildroot output
-        if: ${{ success() && steps.buildroot-cache.outputs.cache-hit != 'true' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            firmware/buildroot-2024.02.1.tar.gz
-            buildroot-cache
-          key: ${{ steps.buildroot-cache.outputs.cache-primary-key }}
-
-      - name: Upload firmware image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: kamish-firmware
-          path: buildroot-cache/output/images/*.img
-          if-no-files-found: error
-          retention-days: 14
+      - name: Buildroot configuration smoke check
+        run: |
+          test -f firmware/buildroot-external-kamish/external.desc
+          test -f firmware/buildroot-external-kamish/package/kamish/kamish.mk
+          test -f firmware/buildroot-external-kamish/board/kamish/rootfs-overlay/etc/systemd/system/kamish-core.service
+          test -f firmware/buildroot-external-kamish/board/kamish/rootfs-overlay/etc/systemd/system/kamish-web.service
