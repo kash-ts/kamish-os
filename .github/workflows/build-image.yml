@@ -1,0 +1,150 @@
+name: Build Firmware SD Card Image
+
+on:
+  workflow_dispatch:
+    inputs:
+      compress_format:
+        description: "Compression format for the raw image (zstd or xz)"
+        required: false
+        default: "zstd"
+        type: choice
+        options:
+          - zstd
+          - xz
+          - none
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build-sdcard-image:
+    name: Build Kamish OS SD Card Image
+    runs-on: ubuntu-22.04
+    timeout-minutes: 180
+
+    steps:
+      - name: Free disk space on runner
+        run: |
+          echo "=== Disk space before cleanup ==="
+          df -h
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
+          sudo docker image prune -a --force || true
+          echo "=== Disk space after cleanup ==="
+          df -h
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Install host cross-compile dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config libasound2-dev zstd xz-utils
+
+      - name: Set up Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-unknown-linux-gnu
+          cache: true
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Build frontend SPA
+        working-directory: crates/kamish-web/frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Cross-compile Kamish release binaries (aarch64)
+        env:
+          CARGO_BUILD_TARGET: aarch64-unknown-linux-gnu
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+        run: |
+          cargo build --release --target aarch64-unknown-linux-gnu -p kamish-core -p kamish-web
+          test -x target/aarch64-unknown-linux-gnu/release/kamish-core
+          test -x target/aarch64-unknown-linux-gnu/release/kamish-web
+          file target/aarch64-unknown-linux-gnu/release/kamish-core target/aarch64-unknown-linux-gnu/release/kamish-web
+
+      - name: Cache Buildroot downloads (dl) and ccache
+        uses: actions/cache@v4
+        with:
+          path: |
+            buildroot-cache/dl
+            buildroot-cache/ccache
+          key: ${{ runner.os }}-buildroot-dl-v1-${{ hashFiles('firmware/buildroot-external-kamish/configs/kamish_orangepi_4_pro_defconfig') }}
+          restore-keys: |
+            ${{ runner.os }}-buildroot-dl-v1-
+
+      - name: Fetch Buildroot tarball
+        run: |
+          bash scripts/fetch-buildroot.sh firmware/buildroot-2024.02.1.tar.gz
+
+      - name: Ensure RAUC keys exist
+        run: |
+          bash firmware/scripts/gen-keys.sh
+
+      - name: Build Kamish OS Image with Buildroot (Docker)
+        working-directory: firmware
+        env:
+          KAMISH_BR_DIR: ${{ github.workspace }}/buildroot-cache
+        run: |
+          mkdir -p ${{ github.workspace }}/buildroot-cache/dl
+          mkdir -p ${{ github.workspace }}/buildroot-cache/ccache
+          sudo chown -R 1000:1000 ${{ github.workspace }}/buildroot-cache
+          docker compose build builder
+          docker compose run --rm builder
+
+      - name: Check generated artifacts
+        run: |
+          ls -lh buildroot-cache/output/images/
+          test -f buildroot-cache/output/images/kamish-sdcard.img
+
+      - name: Compress SD Card image and generate checksums
+        working-directory: buildroot-cache/output/images
+        run: |
+          FORMAT="${{ github.event.inputs.compress_format || 'zstd' }}"
+          echo "Compressing kamish-sdcard.img with $FORMAT..."
+          
+          if [ "$FORMAT" = "zstd" ]; then
+            zstd -T0 -3 --rm kamish-sdcard.img -o kamish-sdcard.img.zst
+            sha256sum kamish-sdcard.img.zst > kamish-sdcard.img.zst.sha256
+          elif [ "$FORMAT" = "xz" ]; then
+            xz -T0 -1 -v kamish-sdcard.img
+            sha256sum kamish-sdcard.img.xz > kamish-sdcard.img.xz.sha256
+          else
+            sha256sum kamish-sdcard.img > kamish-sdcard.img.sha256
+          fi
+          
+          if [ -f rootfs.tar.gz ]; then
+            sha256sum rootfs.tar.gz > rootfs.tar.gz.sha256
+          fi
+          
+          ls -lh
+
+      - name: Upload firmware artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: kamish-os-images
+          path: |
+            buildroot-cache/output/images/*.img*
+            buildroot-cache/output/images/*.sha256
+            buildroot-cache/output/images/rootfs.tar.gz*
+          retention-days: 14
+
+      - name: Publish to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            buildroot-cache/output/images/*.img*
+            buildroot-cache/output/images/*.sha256
+            buildroot-cache/output/images/rootfs.tar.gz*
+          generate_release_notes: true
