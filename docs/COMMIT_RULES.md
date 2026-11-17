@@ -2,8 +2,9 @@
 
 ## Core rule
 
-NEVER `git add .` / `git add -A`. NEVER commit all changes in one commit.
-Split every task into atomic commits: one commit = one logical change.
+NEVER `git add .` / `git add -A`.
+Split tasks into atomic commits: one commit = one logical change.
+Do NOT inflate commits: never artificially fragment a single cohesive change into multiple micro-commits. If a change represents one logical unit (e.g. a feature/fix along with its related config, test, or documentation), commit them together.
 
 ## Workflow (always in this order)
 
@@ -60,7 +61,8 @@ If unsure which group a file belongs to → ask user. Do not guess.
 ## Forbidden
 
 * `git add .` / `git add -A` in any form.
-* One commit mixing feature + fix + deps + docs.
+* One commit mixing completely unrelated changes (e.g. core business logic refactor mixed with unrelated dependency bumps).
+* Artificially inflating commits by splitting a single cohesive change into excessive micro-commits.
 * Vague messages: "update", "changes", "wip", "fix stuff".
 * Committing without prior `git status`/`git diff` check.
 
