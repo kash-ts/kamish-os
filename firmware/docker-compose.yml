@@ -10,9 +10,11 @@ services:
       # package state and output images; the cache is reused across runs.
       - ${KAMISH_BR_DIR:-/home/ipoma/kamish-buildroot}:/build/buildroot
     working_dir: /build/buildroot
-    # Keep Buildroot incremental instead of forcing a full clean rebuild on every run.
+    # Keep Buildroot incremental, but explicitly reinstall Kamish and regenerate
+    # rootfs when any payload or external firmware input changes.
     command: >
       bash -c "
+        set -euo pipefail;
         if [ ! -f /build/buildroot/Makefile ]; then
           echo '=== first run: copying Buildroot tree into cache volume' &&
           cp -a /build/buildroot-orig/. /build/buildroot/ &&
@@ -29,5 +31,15 @@ services:
           cp /workspace/target/aarch64-unknown-linux-gnu/release/$$bin /build/kamish-src/target/aarch64-unknown-linux-gnu/release/$$bin;
         done &&
         make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig &&
-        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc)
+        INPUTS_HASH=$$( { find /build/external -type f -print0 | sort -z | xargs -0 -r sha256sum; find /build/kamish-src/target/aarch64-unknown-linux-gnu/release/kamish-core /build/kamish-src/target/aarch64-unknown-linux-gnu/release/kamish-web /build/kamish-src/crates/kamish-web/frontend/dist /build/kamish-src/database/schema.sql -type f -print0 | sort -z | xargs -0 -r sha256sum; } | sha256sum | cut -d' ' -f1) &&
+        HASH_FILE=/build/buildroot/.kamish-inputs.sha256 &&
+        if [ ! -f $$HASH_FILE ] || [ "$$(cat $$HASH_FILE)" != "$$INPUTS_HASH" ]; then
+          echo '=== Kamish inputs changed: reinstall package and regenerate rootfs' &&
+          make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish-dirclean &&
+          rm -f /build/buildroot/output/images/rootfs.ext4;
+        else
+          echo '=== Kamish inputs unchanged: reuse cached package and rootfs';
+        fi &&
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc) &&
+        printf '%s\\n' "$$INPUTS_HASH" > $$HASH_FILE
       "
