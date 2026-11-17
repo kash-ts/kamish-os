@@ -23,10 +23,8 @@ pub use models::{
     SpeechStatus, SttResult, SynthesizeRequest, SynthesizeResponse, TtsVoice,
     UpdateSpeechConfigRequest, WakeWordEvent,
 };
-pub use stt::{CloudFreeSttProvider, MockSttProvider, SherpaOnnxSttProvider, VoskSttProvider};
+pub use stt::{MockSttProvider, SherpaOnnxSttProvider, VoskSttProvider};
 pub use traits::{SttProvider, TtsProvider, VadDetector, WakeWordDetector};
-pub use tts::{
-    CloudFreeTtsProvider, OfflineFallbackTtsProvider, PiperTtsProvider, RhVoiceTtsProvider,
-};
+pub use tts::{OfflineFallbackTtsProvider, PiperTtsProvider, RhVoiceTtsProvider};
 pub use vad::EnergyVadDetector;
 pub use wakeword::KeywordSpotter;

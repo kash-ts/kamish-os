@@ -177,7 +177,7 @@ Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
 
 **Ловушка:** pip-пакет `vosk` **не устанавливает** бинарник `vosk-transcriber`,
 которого ждёт `VoskSttProvider`. В репозитории лежит обёртка
-[`scripts/vosk-transcriber`](../scripts/vosk-transcriber) — она нужна, иначе STT молча
+[`scripts/vosk-transcriber.py`](../scripts/vosk-transcriber.py) — она нужна, иначе STT молча
 уходит в mock.
 
 Установка моделей одной командой: `scripts/install-local-models.sh`.
@@ -195,7 +195,7 @@ Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
    Если устройства нет — `false`, и это видно в API.
 3. **Никакой подмены в статусах.** Если захват не запущен —
    `microphone_listening: false`, даже если это выглядит менее впечатляюще.
-4. **Заглушка помечается в ответе.** `scripts/agy-mock` на `--version` отвечает
+4. **Заглушка помечается в ответе.** `scripts/agy-mock.sh` на `--version` отвечает
    `Antigravity CLI v1.0.0 (mock)`, а на любой запрос возвращает фиксированную
    строку `Antigravity CLI: alarm set for 07:30.` — это должно быть видно
    вызывающей стороне. Если ответ на разные вопросы всегда одинаковый — работает

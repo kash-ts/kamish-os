@@ -32,15 +32,18 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Cache Buildroot source and output
-        uses: actions/cache@v4
+      # Cache the directory actually bind-mounted at /build/buildroot. Each run
+      # saves a new immutable snapshot; only the same firmware configuration is restored.
+      - name: Restore Buildroot output
+        id: buildroot-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             firmware/buildroot-2024.02.1.tar.gz
-            firmware/buildroot
-          key: ${{ runner.os }}-buildroot-2024.02.1-${{ hashFiles('firmware/buildroot-external-kamish/**/*.mk', 'firmware/docker-compose.yml', 'firmware/Dockerfile') }}
+            buildroot-cache
+          key: ${{ runner.os }}-buildroot-2024.02.1-v2-${{ hashFiles('firmware/buildroot-external-kamish/**', 'firmware/docker-compose.yml', 'firmware/Dockerfile') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            ${{ runner.os }}-buildroot-2024.02.1-
+            ${{ runner.os }}-buildroot-2024.02.1-v2-${{ hashFiles('firmware/buildroot-external-kamish/**', 'firmware/docker-compose.yml', 'firmware/Dockerfile') }}-
 
       - name: Fetch Buildroot tarball
         run: bash scripts/fetch-buildroot.sh
@@ -90,6 +93,15 @@ jobs:
           sudo chown -R 1000:1000 ${{ github.workspace }}/buildroot-cache
           docker compose build builder
           docker compose run --rm builder
+
+      - name: Save Buildroot output
+        if: ${{ success() && steps.buildroot-cache.outputs.cache-hit != 'true' }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            firmware/buildroot-2024.02.1.tar.gz
+            buildroot-cache
+          key: ${{ steps.buildroot-cache.outputs.cache-primary-key }}
 
       - name: Upload firmware image artifact
         uses: actions/upload-artifact@v4

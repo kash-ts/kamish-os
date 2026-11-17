@@ -9,6 +9,8 @@ services:
       # Кэш Buildroot: в CI задаётся KAMISH_BR_DIR=<путь в workspace>, локально — WSL-каталог
       - ${KAMISH_BR_DIR:-/home/ipoma/kamish-buildroot}:/build/buildroot
     working_dir: /build/buildroot
+    # Buildroot does not track local-package source changes on a warm cache;
+    # force Kamish reinstall and rebuild the cached ext4 rootfs image.
     command: >
       bash -c "
         if [ ! -f /build/buildroot/Makefile ]; then
@@ -25,5 +27,7 @@ services:
           fi;
         done &&
         make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig &&
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish-dirclean &&
+        rm -f /build/buildroot/output/images/rootfs.ext4 &&
         make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc)
       "

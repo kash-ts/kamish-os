@@ -27,7 +27,11 @@ async fn main() -> anyhow::Result<()> {
     } else {
         "sqlite:/tmp/kamish_web.db".to_string()
     };
-    let database_url = std::env::var("DATABASE_URL").unwrap_or(default_db);
+    let database_url = std::env::var("WEB_DATABASE_URL")
+        .or_else(|_| std::env::var("DATABASE_URL"))
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or(default_db);
 
     let auth_enabled = std::env::var("AUTH_ENABLED")
         .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))

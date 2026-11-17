@@ -17,7 +17,16 @@ async fn state_with_mock_ai() -> AppState {
     let pool = database::init_pool("sqlite::memory:").await.unwrap();
     database::run_migrations(&pool).await.unwrap();
     // Point the AI CLI at the repository mock so the orchestrator runs for real.
-    let mock = concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/agy-mock");
+    let mock = if std::path::Path::new(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../scripts/agy-mock.sh"
+    ))
+    .is_file()
+    {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/agy-mock.sh")
+    } else {
+        concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/agy-mock")
+    };
     AppState::with_options(pool, mock.to_string(), true)
 }
 

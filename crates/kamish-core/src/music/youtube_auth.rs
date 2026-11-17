@@ -27,7 +27,7 @@ use tracing::{info, warn};
 /// Environment variable pointing at the OAuth helper script.
 const HELPER_ENV: &str = "KAMISH_YOUTUBE_OAUTH_HELPER";
 /// Default helper location, relative to the repository root.
-const HELPER_DEFAULT: &str = "scripts/youtube-oauth";
+const HELPER_DEFAULT: &str = "scripts/youtube-oauth.py";
 /// Maximum time we let the helper talk to Google.
 const HELPER_TIMEOUT_SECS: u64 = 45;
 
@@ -142,7 +142,10 @@ impl YouTubeAuth {
         // Try a few likely locations relative to the working directory.
         for candidate in [
             HELPER_DEFAULT,
+            "scripts/youtube-oauth",
+            "../scripts/youtube-oauth.py",
             "../scripts/youtube-oauth",
+            "/opt/kamish/scripts/youtube-oauth.py",
             "/opt/kamish/scripts/youtube-oauth",
         ] {
             let path = PathBuf::from(candidate);

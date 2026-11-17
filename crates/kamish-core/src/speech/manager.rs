@@ -3,13 +3,9 @@ use crate::speech::models::{
     RecognizeResponse, SimulateWakeWordResponse, SpeechStatus, SttResult, TtsVoice,
     UpdateSpeechConfigRequest, WakeWordEvent,
 };
-use crate::speech::stt::{
-    CloudFreeSttProvider, MockSttProvider, SherpaOnnxSttProvider, VoskSttProvider,
-};
+use crate::speech::stt::{MockSttProvider, SherpaOnnxSttProvider, VoskSttProvider};
 use crate::speech::traits::{SttProvider, TtsProvider, VadDetector, WakeWordDetector};
-use crate::speech::tts::{
-    CloudFreeTtsProvider, OfflineFallbackTtsProvider, PiperTtsProvider, RhVoiceTtsProvider,
-};
+use crate::speech::tts::{OfflineFallbackTtsProvider, PiperTtsProvider, RhVoiceTtsProvider};
 use crate::speech::vad::EnergyVadDetector;
 use crate::speech::wakeword::KeywordSpotter;
 use std::path::PathBuf;
@@ -32,11 +28,9 @@ pub struct SpeechManager {
     pub mock_stt: Arc<MockSttProvider>,
     pub vosk_stt: Arc<VoskSttProvider>,
     pub sherpa_stt: Arc<SherpaOnnxSttProvider>,
-    pub cloud_stt: Arc<CloudFreeSttProvider>,
 
     // TTS Providers
     pub offline_tts: Arc<OfflineFallbackTtsProvider>,
-    pub cloud_tts: Arc<CloudFreeTtsProvider>,
     pub piper_tts: Arc<PiperTtsProvider>,
     pub rhvoice_tts: Arc<RhVoiceTtsProvider>,
 
@@ -70,10 +64,7 @@ impl SpeechManager {
         let mock_stt = Arc::new(MockSttProvider::new());
         let vosk_stt = Arc::new(VoskSttProvider::new());
         let sherpa_stt = Arc::new(SherpaOnnxSttProvider::new());
-        let cloud_stt = Arc::new(CloudFreeSttProvider::new());
-
         let offline_tts = Arc::new(OfflineFallbackTtsProvider::new());
-        let cloud_tts = Arc::new(CloudFreeTtsProvider::new());
         let piper_tts = Arc::new(PiperTtsProvider::new());
         let rhvoice_tts = Arc::new(RhVoiceTtsProvider::new());
 
@@ -89,9 +80,7 @@ impl SpeechManager {
             mock_stt,
             vosk_stt,
             sherpa_stt,
-            cloud_stt,
             offline_tts,
-            cloud_tts,
             piper_tts,
             rhvoice_tts,
             vad,
@@ -172,14 +161,13 @@ impl SpeechManager {
         voices.extend(self.offline_tts.available_voices());
         voices.extend(self.piper_tts.available_voices());
         voices.extend(self.rhvoice_tts.available_voices());
-        voices.extend(self.cloud_tts.available_voices());
         voices
     }
 
     /// Update active provider and configuration
     pub fn update_config(&self, req: UpdateSpeechConfigRequest) -> AppResult<()> {
         if let Some(ref stt) = req.active_stt_provider {
-            let valid = matches!(stt.as_str(), "mock" | "vosk" | "sherpa_onnx" | "cloud_free");
+            let valid = matches!(stt.as_str(), "mock" | "vosk" | "sherpa_onnx");
             if !valid {
                 return Err(AppError::Config(format!("Unknown STT provider: {}", stt)));
             }
@@ -189,10 +177,7 @@ impl SpeechManager {
         }
 
         if let Some(ref tts) = req.active_tts_provider {
-            let valid = matches!(
-                tts.as_str(),
-                "offline_fallback" | "cloud_free" | "piper" | "rhvoice"
-            );
+            let valid = matches!(tts.as_str(), "offline_fallback" | "piper" | "rhvoice");
             if !valid {
                 return Err(AppError::Config(format!("Unknown TTS provider: {}", tts)));
             }
@@ -245,28 +230,6 @@ impl SpeechManager {
 
         // Attempt requested provider
         let primary_result = match target_prov {
-            "cloud_free" => {
-                if self.cloud_tts.is_available() {
-                    self.cloud_tts
-                        .synthesize(text, Some(target_vc), spd)
-                        .await
-                        .map(|bytes| {
-                            let fmt = if bytes.starts_with(b"RIFF") {
-                                "wav"
-                            } else {
-                                "mp3"
-                            };
-                            SynthesizedAudio {
-                                bytes,
-                                format: fmt,
-                                provider: "cloud_free".to_string(),
-                                voice: target_vc.to_string(),
-                            }
-                        })
-                } else {
-                    Err(AppError::Config("CloudFree TTS not available".to_string()))
-                }
-            }
             "piper" => {
                 if self.piper_tts.is_available() {
                     self.piper_tts
@@ -422,15 +385,6 @@ impl SpeechManager {
                 } else {
                     Err(AppError::Config(
                         "Sherpa-onnx STT binary not available".to_string(),
-                    ))
-                }
-            }
-            "cloud_free" => {
-                if self.cloud_stt.is_available() {
-                    self.cloud_stt.recognize(audio_data, lang).await
-                } else {
-                    Err(AppError::Config(
-                        "Cloud STT endpoint not reachable".to_string(),
                     ))
                 }
             }

@@ -82,7 +82,7 @@ graph TD
 5. **Локальные модели STT/TTS**: устанавливаются скриптом `scripts/install-local-models.sh` в `/opt/kamish-models`.
    * Piper TTS — нейросетевой синтез (`PIPER_BIN`, `PIPER_MODEL_PATH`), русский голос `ru_RU-dmitri-medium`.
    * Vosk STT — оффлайн-распознавание (`VOSK_MODEL_PATH`), модель `vosk-model-small-ru-0.22`.
-   * Совместимость: `scripts/vosk-transcriber` — обёртка, которую ожидает `VoskSttProvider` (пакет `vosk` из pip не ставит такой бинарник).
+   * Совместимость: `scripts/vosk-transcriber.py` — обёртка, которую ожидает `VoskSttProvider` (пакет `vosk` из pip не ставит такой бинарник).
    * Язык конвейера — `KAMISH_SPEECH_LANG` (по умолчанию `ru`).
 
 ### 2.3.1. Управление Antigravity CLI (`crates/kamish-core/src/ai/agy_manager.rs`)
