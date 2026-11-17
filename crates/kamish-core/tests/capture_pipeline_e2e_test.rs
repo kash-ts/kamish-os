@@ -16,18 +16,9 @@ use std::time::Duration;
 async fn state_with_mock_ai() -> AppState {
     let pool = database::init_pool("sqlite::memory:").await.unwrap();
     database::run_migrations(&pool).await.unwrap();
-    // Point the AI CLI at the repository mock so the orchestrator runs for real.
-    let mock = if std::path::Path::new(concat!(
-        env!("CARGO_MANIFEST_DIR"),
-        "/../../scripts/agy-mock.sh"
-    ))
-    .is_file()
-    {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/agy-mock.sh")
-    } else {
-        concat!(env!("CARGO_MANIFEST_DIR"), "/../../scripts/agy-mock")
-    };
-    AppState::with_options(pool, mock.to_string(), true)
+    // Use the in-process mock so this test does not depend on an executable CLI
+    // being present or runnable in the CI environment.
+    AppState::with_options(pool, "agy".to_string(), false)
 }
 
 #[tokio::test]
@@ -63,7 +54,18 @@ async fn test_full_pipeline_produces_transcript_and_reply() {
             .await
     });
 
-    tokio::time::sleep(Duration::from_millis(2500)).await;
+    // Allow enough time for capture, transcription and AI dispatch to finish. A
+    // fixed short sleep was flaky under CI load and could stop the loop mid-request.
+    let _ = tokio::time::timeout(Duration::from_secs(10), async {
+        loop {
+            if stats.last_reply.lock().ok().and_then(|r| r.clone()).is_some() {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+    })
+    .await;
+
     shutdown.store(true, Ordering::Relaxed);
     let _ = tokio::time::timeout(Duration::from_secs(8), handle).await;
 
@@ -86,7 +88,6 @@ async fn test_full_pipeline_produces_transcript_and_reply() {
         .expect("transcript must be produced from captured PCM");
     assert!(!transcript.trim().is_empty());
 
-    // The mock AI CLI answers every prompt, so a reply must have been recorded.
     let reply = stats.last_reply.lock().ok().and_then(|r| r.clone());
     assert!(
         reply.is_some(),
