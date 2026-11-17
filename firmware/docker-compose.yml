@@ -25,5 +25,5 @@ services:
           fi;
         done &&
         make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig &&
-        make -j$$(nproc)
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc)
       "
