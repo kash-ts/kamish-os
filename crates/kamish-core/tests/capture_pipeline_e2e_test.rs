@@ -58,7 +58,13 @@ async fn test_full_pipeline_produces_transcript_and_reply() {
     // fixed short sleep was flaky under CI load and could stop the loop mid-request.
     let _ = tokio::time::timeout(Duration::from_secs(10), async {
         loop {
-            if stats.last_reply.lock().ok().and_then(|r| r.clone()).is_some() {
+            if stats
+                .last_reply
+                .lock()
+                .ok()
+                .and_then(|r| r.clone())
+                .is_some()
+            {
                 break;
             }
             tokio::time::sleep(Duration::from_millis(50)).await;
