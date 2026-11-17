@@ -40,6 +40,14 @@ services:
         else
           echo '=== Kamish inputs unchanged: reuse cached package and rootfs';
         fi &&
-        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc) &&
+        set +e;
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc) 2>&1 | tee /build/buildroot/build.log | grep --line-buffered -E '^>>>|error:|warning:|FAILED|Built|Generating';
+        BUILD_EXIT=$${PIPESTATUS[0]};
+        set -e;
+        if [ $$BUILD_EXIT -ne 0 ]; then
+          echo '=== Build failed! Last 100 log lines: ===' >&2;
+          tail -n 100 /build/buildroot/build.log >&2;
+          exit $$BUILD_EXIT;
+        fi &&
         printf '%s\\n' "$$INPUTS_HASH" > $$HASH_FILE
       "
