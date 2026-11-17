@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     bzip2 \
     ca-certificates \
+    cmake \
     cpio \
     curl \
     file \
@@ -24,6 +25,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     mercurial \
     patch \
     perl \
+    pkg-config \
+    pkgconf \
     python3 \
     python3-dev \
     python3-pip \

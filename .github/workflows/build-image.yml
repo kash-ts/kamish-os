@@ -13,6 +13,13 @@ on:
           - xz
           - none
   push:
+    branches:
+      - main
+    paths:
+      - "firmware/**"
+      - "crates/**"
+      - "database/**"
+      - ".github/workflows/build-image.yml"
     tags:
       - "v*"
 
