@@ -81,5 +81,5 @@ jobs:
         run: |
           test -f firmware/buildroot-external-kamish/external.desc
           test -f firmware/buildroot-external-kamish/package/kamish/kamish.mk
-          test -f firmware/buildroot-external-kamish/board/kamish/rootfs-overlay/etc/systemd/system/kamish-core.service
-          test -f firmware/buildroot-external-kamish/board/kamish/rootfs-overlay/etc/systemd/system/kamish-web.service
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-core.service
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-web.service

@@ -158,30 +158,18 @@ ls /opt/kamish/dist/     # SPA (index.html, assets)
 
 ## 7. Автоматическая сборка образа через GitHub Actions (CI)
 
-Сборку образа можно переложить на GitHub — push в `main` или тег `v*`
-собирает полный установочный `.img` автоматически, без локального WSL/Docker.
-Workflow: [`.github/workflows/build-firmware.yml`](../.github/workflows/build-firmware.yml).
+Сборка полного установочного `.img` образа перенесена в GitHub Actions:
+Workflow: [`.github/workflows/build-image.yml`](../.github/workflows/build-image.yml).
 
-Два job в одном workflow:
+### Запуск:
+- **Вручную**: вкладка **Actions → Build Firmware SD Card Image → Run workflow** (можно выбрать сжатие: `zstd` (по умолчанию), `xz` или без сжатия).
+- **По тегу релиза**: при публикации тега `v*` (например, `v0.1.0`) workflow автоматически прикрепляет сжатый образ, SHA256 контрольные суммы и базовый `rootfs.tar.gz` к GitHub Releases.
 
-1. **`rust-cross-build`** — кросс-сборка `kamish-core`/`kamish-web` под
-   `aarch64-unknown-linux-gnu` (stable Rust + `libc6-dev-arm64-cross`).
-   Бинарники загружаются артефактом `kamish-aarch64-bin`.
-2. **`build-image`** — скачивает артефакт, кладёт бинарники в
-   `firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/` и
-   собирает образ через Buildroot в Docker (`docker compose build builder`
-   + `run --rm builder`). Готовый `kamish-sdcard.img` публикуется
-   артефактом `kamish-sdcard-img` (retention 30 дней) и прикрепляется
-   к GitHub Release при пуше тега `v*`.
-
-Запуск вручную: вкладка **Actions → Build Firmware Image → Run workflow**
-(можно задать `version` и `build_id` для маркировки образа).
-
-Секреты не используются — workflow собирает только из публичных исходников
-репозитория. Время: ~15–20 мин на кросс-сборку Rust + 1–3 ч на Buildroot.
-
-> Локальная сборка из разделов 2–4 остаётся актуальной для отладки:
-> CI удобен для релизов и «чистой» проверки, что ветка собирается с нуля.
+### Оптимизации:
+- Используется готовый тулчейн **Bootlin AArch64 glibc** (`BR2_TOOLCHAIN_EXTERNAL_BOOTLIN`), что исключает долгую компиляцию GCC с нуля и экономит 40–50 минут.
+- Кэшируются каталоги загрузок (`dl/`) и кэш компилятора (`ccache`).
+- Очищается диск раннера (~30 ГБ свободного места).
+- Готовый 4 ГБ образ автоматически сжимается с помощью Zstandard (`kamish-sdcard.img.zst`) до ~300 МБ для быстрой загрузки.
 
 ---
 
