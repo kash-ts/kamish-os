@@ -25,6 +25,7 @@ BR2_LINUX_KERNEL_USE_ARCH_DEFAULT_CONFIG=y
 BR2_LINUX_KERNEL_DTS_SUPPORT=y
 BR2_LINUX_KERNEL_INTREE_DTS_NAME="allwinner/sun60i-a733-orangepi-4-pro"
 BR2_LINUX_KERNEL_INSTALL_TARGET=y
+BR2_LINUX_KERNEL_CONFIG_FRAGMENT_FILES="$(BR2_EXTERNAL_KAMISH_PATH)/board/kamish/orangepi-4-pro/linux.fragment"
 
 # Bootloader Tools (mkimage for boot.scr; firmware uses vendor sun60iw2 bootloader in board/kamish/orangepi-4-pro/bootloader)
 BR2_PACKAGE_HOST_UBOOT_TOOLS=y
