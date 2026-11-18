@@ -110,6 +110,11 @@ jobs:
           docker compose build builder
           docker compose run --rm builder
 
+      - name: Fix permissions on buildroot output
+        if: always()
+        run: |
+          sudo chown -R $(id -u):$(id -g) buildroot-cache || true
+
       - name: Print failure log tail
         if: failure()
         run: |
@@ -143,6 +148,7 @@ jobs:
       - name: Compress disk image and generate checksums
         working-directory: buildroot-cache/output/images
         run: |
+          sudo chown -R $(id -u):$(id -g) . || true
           FORMAT="${{ github.event.inputs.compress_format || 'zstd' }}"
           echo "Compressing kamish-sdcard.img with $FORMAT..."
           
