@@ -44,6 +44,6 @@ echo "Booting KAMISH OS from Slot ${boot_slot} (partition ${rootpart})..."
 setenv bootargs "console=ttyS0,115200 root=/dev/mmcblk0p${rootpart} ro rootfstype=ext4 rootwait panic=10 quiet"
 
 load mmc 0:${rootpart} ${kernel_addr_r} /boot/Image
-load mmc 0:${rootpart} ${fdt_addr_r} /boot/sun50i-a733-orangepi-4-pro.dtb
+load mmc 0:${rootpart} ${fdt_addr_r} /boot/sun60i-a733-orangepi-4-pro.dtb
 
 booti ${kernel_addr_r} - ${fdt_addr_r}
