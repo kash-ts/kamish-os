@@ -109,6 +109,14 @@ jobs:
           docker compose build builder
           docker compose run --rm builder
 
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: buildroot-failure-log
+          path: buildroot-cache/build.log
+          if-no-files-found: ignore
+
       - name: Check generated artifacts
         run: |
           ls -lh buildroot-cache/output/images/
