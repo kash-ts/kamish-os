@@ -1,2 +1,6 @@
 # Disable broken vendor Broadcom WiFi driver (missing sunxi_wlan symbols in modpost)
 # CONFIG_BCMDHD is not set
+
+# Disable broken vendor video engine hardware decoder (missing sunxi_enable_device_iommu in vmlinux)
+# CONFIG_AW_VIDEO_ENCODER_DECODER is not set
+# CONFIG_AW_VIDEO_GOOGLE_DECODER is not set
