@@ -1,0 +1,2 @@
+# Disable broken vendor Broadcom WiFi driver (missing sunxi_wlan symbols in modpost)
+# CONFIG_BCMDHD is not set
