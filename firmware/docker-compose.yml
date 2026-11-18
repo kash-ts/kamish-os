@@ -9,6 +9,9 @@ services:
       # Buildroot cache is mounted from the host so repeated builds keep previous
       # package state and output images; the cache is reused across runs.
       - ${KAMISH_BR_DIR:-/home/ipoma/kamish-buildroot}:/build/buildroot
+      - ${KAMISH_BR_DIR:-/home/ipoma/kamish-buildroot}/ccache:/home/builder/.buildroot-ccache
+    environment:
+      - BR2_CCACHE_DIR=/home/builder/.buildroot-ccache
     working_dir: /build/buildroot
     # Keep Buildroot incremental, but explicitly reinstall Kamish and regenerate
     # rootfs when any payload or external firmware input changes.

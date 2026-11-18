@@ -80,14 +80,15 @@ jobs:
           test -x target/aarch64-unknown-linux-gnu/release/kamish-web
           file target/aarch64-unknown-linux-gnu/release/kamish-core target/aarch64-unknown-linux-gnu/release/kamish-web
 
-      - name: Cache Buildroot downloads (dl) and ccache
-        uses: actions/cache@v4
+      - name: Restore Buildroot downloads (dl) and ccache
+        uses: actions/cache/restore@v4
         with:
           path: |
             buildroot-cache/dl
             buildroot-cache/ccache
-          key: ${{ runner.os }}-buildroot-dl-v1-${{ hashFiles('firmware/buildroot-external-kamish/configs/kamish_orangepi_4_pro_defconfig') }}
+          key: ${{ runner.os }}-buildroot-v2-${{ github.sha }}
           restore-keys: |
+            ${{ runner.os }}-buildroot-v2-
             ${{ runner.os }}-buildroot-dl-v1-
 
       - name: Fetch Buildroot tarball
@@ -109,6 +110,14 @@ jobs:
           docker compose build builder
           docker compose run --rm builder
 
+      - name: Print failure log tail
+        if: failure()
+        run: |
+          if [ -f buildroot-cache/build.log ]; then
+            echo "=== Last 200 lines of build.log ==="
+            tail -n 200 buildroot-cache/build.log
+          fi
+
       - name: Upload build log on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -116,6 +125,15 @@ jobs:
           name: buildroot-failure-log
           path: buildroot-cache/build.log
           if-no-files-found: ignore
+
+      - name: Save Buildroot downloads (dl) and ccache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            buildroot-cache/dl
+            buildroot-cache/ccache
+          key: ${{ runner.os }}-buildroot-v2-${{ github.sha }}
 
       - name: Check generated artifacts
         run: |
