@@ -1,5 +1,6 @@
 services:
   builder:
+    image: kamish-br-builder:local
     build:
       context: .
       dockerfile: Dockerfile
@@ -12,45 +13,54 @@ services:
       - ${KAMISH_BR_DIR:-/home/ipoma/kamish-buildroot}/ccache:/home/builder/.buildroot-ccache
     environment:
       - BR2_CCACHE_DIR=/home/builder/.buildroot-ccache
+      - KAMISH_BASE_ONLY=${KAMISH_BASE_ONLY:-0}
     working_dir: /build/buildroot
     # Keep Buildroot incremental, but explicitly reinstall Kamish and regenerate
     # rootfs when any payload or external firmware input changes.
-    command: >
-      bash -c "
-        set -euo pipefail;
+    command:
+      - bash
+      - -c
+      - |
+        set -euo pipefail
         if [ ! -f /build/buildroot/Makefile ]; then
-          echo '=== first run: copying Buildroot tree into cache volume' &&
-          cp -a /build/buildroot-orig/. /build/buildroot/ &&
-          echo '=== Buildroot tree copied';
-        fi &&
-        mkdir -p /build/kamish-src/target/aarch64-unknown-linux-gnu/release &&
-        cp -r /workspace/Cargo.toml /workspace/Cargo.lock /workspace/database /build/kamish-src/ &&
-        rsync -a --exclude node_modules /workspace/crates /build/kamish-src/ &&
-        for bin in kamish-core kamish-web; do
-          if [ ! -s /workspace/target/aarch64-unknown-linux-gnu/release/$$bin ]; then
-            echo 'Missing cross-built $$bin; refusing to reuse a stale cached firmware image' >&2;
-            exit 1;
-          fi;
-          cp /workspace/target/aarch64-unknown-linux-gnu/release/$$bin /build/kamish-src/target/aarch64-unknown-linux-gnu/release/$$bin;
-        done &&
-        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig &&
-        INPUTS_HASH=$$( { find /build/external -type f -print0 | sort -z | xargs -0 -r sha256sum; find /build/kamish-src/target/aarch64-unknown-linux-gnu/release/kamish-core /build/kamish-src/target/aarch64-unknown-linux-gnu/release/kamish-web /build/kamish-src/crates/kamish-web/frontend/dist /build/kamish-src/database/schema.sql -type f -print0 | sort -z | xargs -0 -r sha256sum; } | sha256sum | cut -d' ' -f1) &&
-        HASH_FILE=/build/buildroot/.kamish-inputs.sha256 &&
-        if [ ! -f $$HASH_FILE ] || [ "$$(cat $$HASH_FILE)" != "$$INPUTS_HASH" ]; then
-          echo '=== Kamish inputs changed: reinstall package and regenerate rootfs' &&
-          make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish-dirclean &&
-          rm -f /build/buildroot/output/images/rootfs.ext4;
+          echo '=== first run: copying Buildroot tree into cache volume'
+          cp -a /build/buildroot-orig/. /build/buildroot/
+          echo '=== Buildroot tree copied'
+        fi
+        rm -rf /build/kamish-src
+        mkdir -p /build/kamish-src
+        cp -r /workspace/Cargo.toml /workspace/Cargo.lock /workspace/database /build/kamish-src/
+        if [ "$${KAMISH_BASE_ONLY:-0}" != '1' ]; then
+          mkdir -p /build/kamish-src/target/aarch64-unknown-linux-gnu/release
+          rsync -a --exclude node_modules --exclude target /workspace/crates /build/kamish-src/
+          for bin in kamish-core kamish-web; do
+            if [ ! -s "/workspace/target/aarch64-unknown-linux-gnu/release/$$bin" ]; then
+              echo "Missing cross-built $$bin; refusing to reuse a stale cached firmware image" >&2
+              exit 1
+            fi
+            cp "/workspace/target/aarch64-unknown-linux-gnu/release/$$bin" "/build/kamish-src/target/aarch64-unknown-linux-gnu/release/$$bin"
+          done
+          INPUTS_HASH=$$( { find /build/external -type f -print0 | sort -z | xargs -0 -r sha256sum; find /build/kamish-src/target/aarch64-unknown-linux-gnu/release/kamish-core /build/kamish-src/target/aarch64-unknown-linux-gnu/release/kamish-web /build/kamish-src/crates/kamish-web/frontend/dist /build/kamish-src/database/schema.sql -type f -print0 | sort -z | xargs -0 -r sha256sum; } | sha256sum | cut -d' ' -f1)
         else
-          echo '=== Kamish inputs unchanged: reuse cached package and rootfs';
-        fi &&
-        set +e;
-        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc) 2>&1 | tee /build/buildroot/build.log | grep --line-buffered -E '^>>>|error:|warning:|FAILED|Built|Generating';
-        BUILD_EXIT=$${PIPESTATUS[0]};
-        set -e;
-        if [ $$BUILD_EXIT -ne 0 ]; then
-          echo '=== Build failed! Last 100 log lines: ===' >&2;
-          tail -n 100 /build/buildroot/build.log >&2;
-          exit $$BUILD_EXIT;
-        fi &&
-        printf '%s\\n' "$$INPUTS_HASH" > $$HASH_FILE
-      "
+          echo '=== KAMISH_BASE_ONLY=1: building Base OS without application binaries'
+          INPUTS_HASH=$$( { find /build/external -type f -print0 | sort -z | xargs -0 -r sha256sum; sha256sum /build/kamish-src/database/schema.sql; } | sha256sum | cut -d' ' -f1)
+        fi
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish_orangepi_4_pro_defconfig
+        HASH_FILE=/build/buildroot/.kamish-inputs.sha256
+        if [ ! -f "$$HASH_FILE" ] || [ "$$(cat "$$HASH_FILE")" != "$$INPUTS_HASH" ]; then
+          echo '=== Kamish inputs changed: reinstall package and regenerate rootfs'
+          make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src kamish-dirclean
+          rm -f /build/buildroot/output/images/rootfs.ext4 /build/buildroot/output/images/rootfs.tar*
+        else
+          echo '=== Kamish inputs unchanged: reuse cached package and rootfs'
+        fi
+        set +e
+        make BR2_EXTERNAL=/build/external KAMISH_SITE=/build/kamish-src -j$$(nproc) 2>&1 | tee /build/buildroot/build.log | grep --line-buffered -E '^>>>|error:|warning:|FAILED|Built|Generating'
+        BUILD_EXIT=$${PIPESTATUS[0]}
+        set -e
+        if [ "$$BUILD_EXIT" -ne 0 ]; then
+          echo '=== Build failed! Last 100 log lines: ===' >&2
+          tail -n 100 /build/buildroot/build.log >&2
+          exit "$$BUILD_EXIT"
+        fi
+        printf '%s\n' "$$INPUTS_HASH" > "$$HASH_FILE"

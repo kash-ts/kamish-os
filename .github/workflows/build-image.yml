@@ -1,56 +1,187 @@
-name: Build Firmware Disk Image
+name: Build Firmware Disk Image & RAUC Bundle
 
 on:
   workflow_dispatch:
     inputs:
-      compress_format:
-        description: "Compression format for the raw disk image (zstd or xz)"
+      output_mode:
+        description: "Artifacts to build (all, raucb_only, or img_only)"
         required: false
-        default: "zstd"
+        default: "all"
         type: choice
         options:
-          - zstd
+          - all
+          - raucb_only
+          - img_only
+      compress_format:
+        description: "Compression format for kamish-sdcard.img (xz recommended for direct balenaEtcher flash)"
+        required: false
+        default: "xz"
+        type: choice
+        options:
           - xz
+          - zstd
           - none
+      rebuild_base_os:
+        description: "Force rebuilding Base OS (Buildroot) instead of reusing cached Base OS artifact"
+        required: false
+        default: false
+        type: boolean
   push:
     branches:
       - main
     paths:
-      - "firmware/**"
       - "crates/**"
       - "database/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "firmware/Dockerfile"
+      - "firmware/docker-compose.yml"
+      - "firmware/buildroot-external-kamish/configs/**"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/linux.fragment"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/bootloader/**"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/users.table"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/**"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/rauc/**"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/genimage.cfg"
+      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/boot.cmd"
+      - "firmware/scripts/**"
+      - "scripts/fetch-buildroot.sh"
+      - "scripts/repack-image.sh"
+      - "scripts/verify-image.sh"
+      - ".github/workflows/build-base-os.yml"
       - ".github/workflows/build-image.yml"
     tags:
       - "v*"
 
 permissions:
   contents: write
+  actions: read
+
+concurrency:
+  group: build-image-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
-  build-disk-image:
-    name: Build Kamish OS Disk Image (microSD / eMMC / NVMe)
-    runs-on: ubuntu-22.04
-    timeout-minutes: 180
+  resolve-base-os:
+    name: Resolve Cached Base OS Artifact
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 5
+    outputs:
+      need_rebuild: ${{ steps.check.outputs.need_rebuild }}
+      base_run_id: ${{ steps.check.outputs.base_run_id }}
+      artifact_name: ${{ steps.check.outputs.artifact_name }}
 
     steps:
-      - name: Free disk space on runner
-        run: |
-          echo "=== Disk space before cleanup ==="
-          df -h
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache
-          sudo docker image prune -a --force || true
-          echo "=== Disk space after cleanup ==="
-          df -h
-
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
 
-      - name: Install host cross-compile dependencies
+      - name: Check for unexpired Base OS artifact
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE_REBUILD: ${{ inputs.rebuild_base_os == true }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y gcc-aarch64-linux-gnu binutils-aarch64-linux-gnu pkg-config libasound2-dev zstd xz-utils
+          set -euo pipefail
+          BASE_OS_HASH="$(
+            find \
+              firmware/Dockerfile \
+              firmware/docker-compose.yml \
+              firmware/buildroot-external-kamish/configs \
+              firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/linux.fragment \
+              firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/bootloader \
+              firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/users.table \
+              scripts/fetch-buildroot.sh \
+              -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | sha256sum | cut -c1-12
+          )"
+          EXPECTED_ARTIFACT="kamish-base-os-${BASE_OS_HASH}"
+          echo "Expected Base OS artifact: ${EXPECTED_ARTIFACT}"
+          echo "artifact_name=${EXPECTED_ARTIFACT}" >> "${GITHUB_OUTPUT}"
+
+          if [[ "${FORCE_REBUILD}" == "true" ]]; then
+            echo "Base OS rebuild explicitly requested via workflow_dispatch."
+            echo "need_rebuild=true" >> "${GITHUB_OUTPUT}"
+            echo "base_run_id=" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+
+          FOUND_RUN_ID="$(python3 - "${GITHUB_REPOSITORY}" "${EXPECTED_ARTIFACT}" <<'PYEOF'
+          import json, subprocess, sys
+
+          repo = sys.argv[1]
+          expected_artifact = sys.argv[2]
+
+          def gh_json(endpoint):
+              proc = subprocess.run(["gh", "api", endpoint], capture_output=True, text=True)
+              if proc.returncode != 0:
+                  return {}
+              try:
+                  return json.loads(proc.stdout)
+              except Exception:
+                  return {}
+
+          candidates = {}
+          for endpoint in (
+              f"repos/{repo}/actions/workflows/build-base-os.yml/runs?branch=main&status=success&per_page=10",
+              f"repos/{repo}/actions/workflows/build-image.yml/runs?branch=main&status=success&per_page=15",
+          ):
+              for run in gh_json(endpoint).get("workflow_runs", []):
+                  rid = run.get("id")
+                  if rid and rid not in candidates:
+                      candidates[rid] = run
+
+          for rid in sorted(candidates, reverse=True):
+              artifacts = gh_json(f"repos/{repo}/actions/runs/{rid}/artifacts").get("artifacts", [])
+              for art in artifacts:
+                  if art.get("name") == expected_artifact and not art.get("expired", True):
+                      print(rid)
+                      sys.exit(0)
+          PYEOF
+          )"
+
+          if [[ -n "${FOUND_RUN_ID}" ]]; then
+            echo "Found reusable Base OS artifact ${EXPECTED_ARTIFACT} in run ${FOUND_RUN_ID}."
+            echo "need_rebuild=false" >> "${GITHUB_OUTPUT}"
+            echo "base_run_id=${FOUND_RUN_ID}" >> "${GITHUB_OUTPUT}"
+          else
+            echo "No unexpired ${EXPECTED_ARTIFACT} artifact found; triggering fallback Base OS build."
+            echo "need_rebuild=true" >> "${GITHUB_OUTPUT}"
+            echo "base_run_id=" >> "${GITHUB_OUTPUT}"
+          fi
+
+  build-base-os-fallback:
+    name: Build Base OS Fallback
+    needs: [resolve-base-os]
+    if: needs.resolve-base-os.outputs.need_rebuild == 'true'
+    uses: ./.github/workflows/build-base-os.yml
+    with:
+      force_rebuild: ${{ inputs.rebuild_base_os == true }}
+    secrets: inherit
+
+  build-app:
+    name: Build Kamish Application (ARM64 Native + glibc 2.35)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: "npm"
+          cache-dependency-path: crates/kamish-web/frontend/package-lock.json
+
+      - name: Build frontend SPA
+        working-directory: crates/kamish-web/frontend
+        run: |
+          npm ci
+          npm run build
 
       - name: Set up Rust toolchain
         uses: actions-rust-lang/setup-rust-toolchain@v1
@@ -59,113 +190,227 @@ jobs:
           target: aarch64-unknown-linux-gnu
           cache: true
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
         with:
-          node-version: 20
+          version: "0.13.0"
 
-      - name: Build frontend SPA
-        working-directory: crates/kamish-web/frontend
-        run: |
-          npm ci
-          npm run build
+      - name: Install cargo-zigbuild
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-zigbuild
 
-      - name: Cross-compile Kamish release binaries (aarch64)
-        env:
-          CARGO_BUILD_TARGET: aarch64-unknown-linux-gnu
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+      - name: Build release binaries targeting glibc 2.35
         run: |
-          cargo build --release --quiet --target aarch64-unknown-linux-gnu -p kamish-core -p kamish-web
+          cargo zigbuild --release --target aarch64-unknown-linux-gnu.2.35 -p kamish-core -p kamish-web
           test -x target/aarch64-unknown-linux-gnu/release/kamish-core
           test -x target/aarch64-unknown-linux-gnu/release/kamish-web
-          file target/aarch64-unknown-linux-gnu/release/kamish-core target/aarch64-unknown-linux-gnu/release/kamish-web
 
-      - name: Restore Buildroot downloads (dl) and ccache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            buildroot-cache/dl
-            buildroot-cache/ccache
-          key: ${{ runner.os }}-buildroot-v2-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-buildroot-v2-
-            ${{ runner.os }}-buildroot-dl-v1-
-
-      - name: Fetch Buildroot tarball
+      - name: Early ELF & GLIBC ceiling check
         run: |
-          bash scripts/fetch-buildroot.sh firmware/buildroot-2024.02.1.tar.gz
+          set -euo pipefail
+          for bin in target/aarch64-unknown-linux-gnu/release/kamish-core target/aarch64-unknown-linux-gnu/release/kamish-web; do
+            file "${bin}"
+            file -b "${bin}" | grep -q "ARM aarch64"
+            max_glibc="$(readelf -V "${bin}" | grep -oE 'GLIBC_[0-9]+(\.[0-9]+)+' | sed 's/GLIBC_//' | sort -V | tail -n1 || true)"
+            echo "${bin}: max GLIBC = ${max_glibc:-static}"
+            if [[ -n "${max_glibc}" ]]; then
+              python3 - "${max_glibc}" "2.35" <<'PYEOF'
+          import sys
+          req = tuple(int(x) for x in sys.argv[1].split("."))
+          cap = tuple(int(x) for x in sys.argv[2].split("."))
+          if req > cap:
+              sys.exit(f"GLIBC {sys.argv[1]} exceeds ceiling {sys.argv[2]}")
+          PYEOF
+            fi
+          done
 
-      - name: Ensure RAUC keys exist
+      - name: Stage application payload
         run: |
-          bash firmware/scripts/gen-keys.sh
+          rm -rf app-payload
+          mkdir -p app-payload/dist
+          cp target/aarch64-unknown-linux-gnu/release/kamish-core app-payload/
+          cp target/aarch64-unknown-linux-gnu/release/kamish-web app-payload/
+          cp -a crates/kamish-web/frontend/dist/. app-payload/dist/
+          cp database/schema.sql app-payload/schema.sql
+          ls -lh app-payload
 
-      - name: Build Kamish OS Image with Buildroot (Docker)
-        working-directory: firmware
-        env:
-          KAMISH_BR_DIR: ${{ github.workspace }}/buildroot-cache
-        run: |
-          mkdir -p ${{ github.workspace }}/buildroot-cache/dl
-          mkdir -p ${{ github.workspace }}/buildroot-cache/ccache
-          sudo chown -R 1000:1000 ${{ github.workspace }}/buildroot-cache
-          docker compose build builder
-          docker compose run --rm builder
-
-      - name: Fix permissions on buildroot output
-        if: always()
-        run: |
-          sudo chown -R $(id -u):$(id -g) buildroot-cache || true
-
-      - name: Print failure log tail
-        if: failure()
-        run: |
-          if [ -f buildroot-cache/build.log ]; then
-            echo "=== Last 200 lines of build.log ==="
-            tail -n 200 buildroot-cache/build.log
-          fi
-
-      - name: Upload build log on failure
-        if: failure()
+      - name: Upload application payload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: buildroot-failure-log
-          path: buildroot-cache/build.log
-          if-no-files-found: ignore
+          name: kamish-app-payload
+          path: app-payload/
+          retention-days: 1
 
-      - name: Save Buildroot downloads (dl) and ccache
-        if: always()
-        uses: actions/cache/save@v4
+  assemble-and-verify:
+    name: Repack, Verify & Package (.img / .raucb)
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 25
+    needs: [resolve-base-os, build-base-os-fallback, build-app]
+    if: ${{ !failure() && !cancelled() && needs.resolve-base-os.result == 'success' && needs.build-app.result == 'success' && (needs.build-base-os-fallback.result == 'success' || needs.build-base-os-fallback.result == 'skipped') }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
-          path: |
-            buildroot-cache/dl
-            buildroot-cache/ccache
-          key: ${{ runner.os }}-buildroot-v2-${{ github.sha }}
+          fetch-depth: 1
 
-      - name: Check generated artifacts
+      - name: Install image repack and verification tools
         run: |
-          ls -lh buildroot-cache/output/images/
-          test -f buildroot-cache/output/images/kamish-sdcard.img
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            binutils \
+            genimage \
+            rauc \
+            squashfs-tools \
+            e2fsprogs \
+            dosfstools \
+            mtools \
+            xz-utils \
+            zstd \
+            u-boot-tools \
+            fdisk \
+            file
 
-      - name: Compress disk image and generate checksums
-        working-directory: buildroot-cache/output/images
+      - name: Download application payload
+        uses: actions/download-artifact@v4
+        with:
+          name: kamish-app-payload
+          path: app-payload
+
+      - name: Download Base OS artifact (from fallback job)
+        if: needs.build-base-os-fallback.result == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build-base-os-fallback.outputs.artifact_name }}
+          path: base-os
+
+      - name: Download Base OS artifact (from cached Base OS run)
+        if: needs.build-base-os-fallback.result == 'skipped'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ needs.resolve-base-os.outputs.base_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: ${{ needs.resolve-base-os.outputs.artifact_name }}
+          path: base-os
+
+      - name: Prepare RAUC signing keys
+        env:
+          RAUC_SIGN_KEY_PEM: ${{ secrets.RAUC_SIGN_KEY_PEM }}
+          RAUC_SIGN_CERT_PEM: ${{ secrets.RAUC_SIGN_CERT_PEM }}
+          RAUC_KEYRING_PEM: ${{ secrets.RAUC_KEYRING_PEM }}
         run: |
-          sudo chown -R $(id -u):$(id -g) . || true
-          FORMAT="${{ github.event.inputs.compress_format || 'zstd' }}"
-          echo "Compressing kamish-sdcard.img with $FORMAT..."
-          
-          if [ "$FORMAT" = "zstd" ]; then
-            zstd -T0 -3 --rm kamish-sdcard.img -o kamish-sdcard.img.zst
-            sha256sum kamish-sdcard.img.zst > kamish-sdcard.img.zst.sha256
-          elif [ "$FORMAT" = "xz" ]; then
-            xz -T0 -1 -v kamish-sdcard.img
-            sha256sum kamish-sdcard.img.xz > kamish-sdcard.img.xz.sha256
+          set -euo pipefail
+          rm -rf /tmp/rauc-keys
+          mkdir -p /tmp/rauc-keys
+          chmod 700 /tmp/rauc-keys
+
+          if [[ -n "${RAUC_SIGN_KEY_PEM}" && -n "${RAUC_SIGN_CERT_PEM}" ]]; then
+            printf '%s\n' "${RAUC_SIGN_KEY_PEM}" > /tmp/rauc-keys/sign.key.pem
+            printf '%s\n' "${RAUC_SIGN_CERT_PEM}" > /tmp/rauc-keys/sign.cert.pem
+            chmod 600 /tmp/rauc-keys/sign.key.pem
+            chmod 644 /tmp/rauc-keys/sign.cert.pem
+
+            if [[ -n "${RAUC_KEYRING_PEM}" ]]; then
+              printf '%s\n' "${RAUC_KEYRING_PEM}" > /tmp/rauc-keys/keyring.pem
+            elif [[ -f firmware/keys/keyring.pem ]]; then
+              cp firmware/keys/keyring.pem /tmp/rauc-keys/keyring.pem
+            else
+              echo "ERROR: RAUC_KEYRING_PEM secret is unset and firmware/keys/keyring.pem does not exist" >&2
+              exit 1
+            fi
+            chmod 644 /tmp/rauc-keys/keyring.pem
+
+            echo "RAUC_CERT=/tmp/rauc-keys/sign.cert.pem" >> "${GITHUB_ENV}"
+            echo "RAUC_KEY=/tmp/rauc-keys/sign.key.pem" >> "${GITHUB_ENV}"
+            echo "RAUC_KEYRING=/tmp/rauc-keys/keyring.pem" >> "${GITHUB_ENV}"
+            echo "SIGNING_MODE=production-secret" >> "${GITHUB_ENV}"
           else
-            sha256sum kamish-sdcard.img > kamish-sdcard.img.sha256
+            echo "::warning::RAUC secrets not configured; generating ephemeral dev signing keys for this run."
+            bash firmware/scripts/gen-keys.sh --dir /tmp/rauc-keys --no-overlay
+            echo "RAUC_CERT=/tmp/rauc-keys/development-1.cert.pem" >> "${GITHUB_ENV}"
+            echo "RAUC_KEY=/tmp/rauc-keys/development-1.key.pem" >> "${GITHUB_ENV}"
+            echo "RAUC_KEYRING=/tmp/rauc-keys/keyring.pem" >> "${GITHUB_ENV}"
+            echo "SIGNING_MODE=ephemeral-dev" >> "${GITHUB_ENV}"
           fi
-          
-          if [ -f rootfs.tar.gz ]; then
-            sha256sum rootfs.tar.gz > rootfs.tar.gz.sha256
+
+      - name: Determine release version and build ID
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF_NAME#v}"
+          else
+            VERSION="0.1.0"
           fi
-          
+          BUILD_ID="$(date -u +%Y%m%d%H%M)-${GITHUB_SHA::7}"
+          BASE_RUN_ID="${{ needs.build-base-os-fallback.outputs.run_id || needs.resolve-base-os.outputs.base_run_id }}"
+          echo "KAMISH_VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "KAMISH_BUILD_ID=${BUILD_ID}" >> "${GITHUB_ENV}"
+          echo "KAMISH_BASE_RUN_ID=${BASE_RUN_ID}" >> "${GITHUB_ENV}"
+          echo "KAMISH_OUTPUT_MODE=${{ github.event.inputs.output_mode || 'all' }}" >> "${GITHUB_ENV}"
+          echo "KAMISH_COMPRESS_FORMAT=${{ github.event.inputs.compress_format || 'xz' }}" >> "${GITHUB_ENV}"
+
+      - name: Repack rootfs, SD card image, and RAUC bundle
+        run: |
+          chmod +x app-payload/kamish-core app-payload/kamish-web
+          bash scripts/repack-image.sh \
+            --base-os-dir base-os \
+            --payload-dir app-payload \
+            --out-dir out-images \
+            --version "${KAMISH_VERSION}" \
+            --build-id "${KAMISH_BUILD_ID}" \
+            --mode "${KAMISH_OUTPUT_MODE}" \
+            --rauc-cert "${RAUC_CERT}" \
+            --rauc-key "${RAUC_KEY}" \
+            --rauc-keyring "${RAUC_KEYRING}" \
+            --signing-mode "${SIGNING_MODE}" \
+            --base-run-id "${KAMISH_BASE_RUN_ID}" \
+            --staging-dir /tmp/kamish-staging
+
+      - name: Verify image, rootfs, glibc compatibility, and RAUC bundle
+        run: |
+          bash scripts/verify-image.sh \
+            --out-dir out-images \
+            --staging-dir /tmp/kamish-staging \
+            --mode "${KAMISH_OUTPUT_MODE}" \
+            --signing-mode "${SIGNING_MODE}" \
+            --max-glibc 2.35
+
+      - name: Clean up ephemeral keys and staging rootfs
+        if: always()
+        run: |
+          rm -rf /tmp/rauc-keys
+          sudo rm -rf /tmp/kamish-staging
+
+      - name: Compress disk image and generate SHA-256 checksums
+        working-directory: out-images
+        run: |
+          set -euo pipefail
+          rm -f rootfs.ext4 data.ext4
+
+          if [[ "${KAMISH_OUTPUT_MODE}" != "raucb_only" ]]; then
+            case "${KAMISH_COMPRESS_FORMAT}" in
+              xz)
+                echo "Compressing kamish-sdcard.img with xz..."
+                xz -T0 -6 --force kamish-sdcard.img
+                ;;
+              zstd)
+                echo "Compressing kamish-sdcard.img with zstd..."
+                zstd -T0 -6 --rm kamish-sdcard.img -o kamish-sdcard.img.zst
+                ;;
+              none)
+                echo "Keeping uncompressed kamish-sdcard.img..."
+                ;;
+              *)
+                echo "ERROR: Unsupported compress format: ${KAMISH_COMPRESS_FORMAT}" >&2
+                exit 1
+                ;;
+            esac
+          fi
+
+          shopt -s nullglob
+          for artifact in *.img *.img.xz *.img.zst *.raucb; do
+            sha256sum "${artifact}" > "${artifact}.sha256"
+          done
           ls -lh
 
       - name: Upload firmware artifacts
@@ -173,9 +418,8 @@ jobs:
         with:
           name: kamish-os-images
           path: |
-            buildroot-cache/output/images/*.img*
-            buildroot-cache/output/images/*.sha256
-            buildroot-cache/output/images/rootfs.tar.gz*
+            out-images/*.img*
+            out-images/*.raucb*
           retention-days: 14
 
       - name: Publish to GitHub Release
@@ -183,7 +427,6 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            buildroot-cache/output/images/*.img*
-            buildroot-cache/output/images/*.sha256
-            buildroot-cache/output/images/rootfs.tar.gz*
+            out-images/*.img*
+            out-images/*.raucb*
           generate_release_notes: true

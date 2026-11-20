@@ -1,0 +1,3 @@
+# <file system>  <mount point>  <type>  <options>                                 <dump>  <pass>
+/dev/root        /              auto    ro                                        0       1
+LABEL=data       /data          ext4    defaults,noatime,nofail,x-systemd.growfs  0       2

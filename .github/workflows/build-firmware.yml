@@ -81,5 +81,16 @@ jobs:
         run: |
           test -f firmware/buildroot-external-kamish/external.desc
           test -f firmware/buildroot-external-kamish/package/kamish/kamish.mk
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/users.table
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/fstab
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/rauc/system.conf
           test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-core.service
           test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-web.service
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-mounts.service
+          test -f scripts/repack-image.sh
+          test -f scripts/verify-image.sh
+          bash -n scripts/repack-image.sh
+          bash -n scripts/verify-image.sh
+          bash -n firmware/scripts/gen-keys.sh
+          bash -n firmware/scripts/build-bundle.sh
+          bash -n firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/post-image.sh
