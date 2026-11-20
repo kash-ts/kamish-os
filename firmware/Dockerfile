@@ -41,6 +41,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     bison \
     zstd \
     rauc \
+    squashfs-tools \
+    e2fsprogs \
     openssl \
     dosfstools \
     mtools \

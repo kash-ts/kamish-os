@@ -1,6 +1,7 @@
 [Unit]
 Description=Kamish OS Web Panel Service
-After=network.target kamish-core.service
+After=network.target kamish-mounts.service kamish-core.service
+Wants=kamish-mounts.service
 Requires=kamish-core.service
 
 [Service]

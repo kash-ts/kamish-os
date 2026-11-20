@@ -29,13 +29,24 @@ sed -e "s/@VERSION@/${VERSION}/g" \
     -e "s/@BUILD_ID@/${BUILD_ID}/g" \
     "${BOARD_DIR}/rauc/manifest.raucm.template" > "${BUNDLE_DIR}/manifest.raucm"
 
-OUTPUT_BUNDLE="${SCRIPT_DIR}/../kamish-os-v${VERSION}-${BUILD_ID}.raucb"
+OUTPUT_BUNDLE="${RAUC_OUTPUT:-${SCRIPT_DIR}/../kamish-os-v${VERSION}-${BUILD_ID}.raucb}"
+RAUC_CERT_PATH="${RAUC_CERT:-${KEYS_DIR}/development-1.cert.pem}"
+RAUC_KEY_PATH="${RAUC_KEY:-${KEYS_DIR}/development-1.key.pem}"
 
 # 3. Sign and pack bundle with RAUC
 if command -v rauc >/dev/null 2>&1; then
+    if [[ ! -f "${RAUC_CERT_PATH}" ]]; then
+        echo "ERROR: RAUC signing certificate not found: ${RAUC_CERT_PATH}" >&2
+        exit 1
+    fi
+    if [[ ! -f "${RAUC_KEY_PATH}" ]]; then
+        echo "ERROR: RAUC signing private key not found: ${RAUC_KEY_PATH}" >&2
+        exit 1
+    fi
+    rm -f "${OUTPUT_BUNDLE}"
     rauc bundle \
-        --cert="${KEYS_DIR}/development-1.cert.pem" \
-        --key="${KEYS_DIR}/development-1.key.pem" \
+        --cert="${RAUC_CERT_PATH}" \
+        --key="${RAUC_KEY_PATH}" \
         "${BUNDLE_DIR}" \
         "${OUTPUT_BUNDLE}"
     echo "=== RAUC Bundle signed and created: ${OUTPUT_BUNDLE} ==="

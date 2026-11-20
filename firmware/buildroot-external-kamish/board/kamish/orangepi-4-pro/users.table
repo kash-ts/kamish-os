@@ -1,0 +1,1 @@
+kamish -1 kamish -1 ! /home/kamish /bin/sh audio,dialout,netdev,bluetooth,video "Kamish OS Service User"

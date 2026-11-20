@@ -30,3 +30,8 @@ crates/kamish-web/frontend/node_modules/
 crates/kamish-web/frontend/dist/
 *.local
 
+# RAUC private keys and intermediate CSR/serial files (keep public keyring.pem only)
+firmware/keys/*.key.pem
+firmware/keys/*.csr
+firmware/keys/*.srl
+
