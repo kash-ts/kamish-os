@@ -58,6 +58,9 @@ pub async fn start_core_daemon(config: &Config) -> AppResult<(CoreState, IpcServ
         }
     });
 
+    // Spawn hardware power button gesture monitor (1 click: shutdown, 3 clicks: factory reset)
+    system::power_button::start_power_button_monitor(state.clone());
+
     // Bind IPC Server
     let socket_path = resolve_socket_path();
     let ipc_server = IpcServer::bind(&socket_path)

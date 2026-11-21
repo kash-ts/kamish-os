@@ -1,5 +1,6 @@
 pub mod events;
 pub mod hardware;
+pub mod power_button;
 pub mod ssh;
 pub mod update;
 
