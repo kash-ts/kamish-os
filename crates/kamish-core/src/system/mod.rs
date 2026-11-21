@@ -48,11 +48,12 @@ pub fn get_device_info() -> DeviceInfo {
         } else {
             host_name_raw.to_lowercase().replace('_', "-")
         };
-    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let port = std::env::var("PORT").unwrap_or_else(|_| "80".to_string());
+    let port_suffix = if port == "80" { "".to_string() } else { format!(":{port}") };
     let local_url = if clean_hostname == "kamish" {
-        format!("http://kamish.local:{port}")
+        format!("http://kamish.local{port_suffix}")
     } else {
-        format!("http://{clean_hostname}.local:{port}")
+        format!("http://{clean_hostname}.local{port_suffix}")
     };
     let hostname = if host_name_raw.is_empty() || host_name_raw == "localhost" {
         "kamish".to_string()

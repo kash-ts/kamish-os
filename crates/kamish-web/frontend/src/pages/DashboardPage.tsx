@@ -37,7 +37,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onOpenCreateReminder,
 }) => {
   const [copied, setCopied] = React.useState(false);
-  const localUrl = status?.device?.local_url || 'http://kamish.local:8080';
+  const localUrl = status?.device?.local_url || 'http://kamish.local';
 
   const handleCopy = () => {
     if (navigator.clipboard) {

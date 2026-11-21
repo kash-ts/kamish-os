@@ -20,7 +20,7 @@ TimeoutStopSec=10s
 EnvironmentFile=-/etc/kamish/kamish-web.env
 Environment="RUST_LOG=info"
 Environment="HOST=0.0.0.0"
-Environment="PORT=8080"
+Environment="PORT=80"
 Environment="WEB_DATABASE_URL=sqlite:///var/lib/kamish/web.db"
 Environment="KAMISH_IPC_SOCKET=/run/kamish/core.sock"
 Environment="STATIC_DIR=/opt/kamish/dist"
