@@ -67,7 +67,10 @@ pub fn find_power_button_device() -> Option<PathBuf> {
             for line in devices_content.lines() {
                 let trimmed = line.trim();
                 if trimmed.starts_with("N: Name=") {
-                    current_name = trimmed.trim_start_matches("N: Name=").replace('"', "").to_lowercase();
+                    current_name = trimmed
+                        .trim_start_matches("N: Name=")
+                        .replace('"', "")
+                        .to_lowercase();
                 } else if trimmed.starts_with("H: Handlers=") {
                     let handlers = trimmed.trim_start_matches("H: Handlers=");
                     let is_power_dev = current_name.contains("pek")
@@ -169,7 +172,11 @@ async fn run_monitor_loop(state: CoreState) {
             let mut file = match tokio::fs::File::open(&dev_path).await {
                 Ok(f) => f,
                 Err(e) => {
-                    error!("Failed to open {}: {}. Retrying in 5s...", dev_path.display(), e);
+                    error!(
+                        "Failed to open {}: {}. Retrying in 5s...",
+                        dev_path.display(),
+                        e
+                    );
                     tokio::time::sleep(Duration::from_secs(5)).await;
                     continue;
                 }
