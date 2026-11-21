@@ -7,7 +7,7 @@ Wants=sound.target bluetooth.target
 Type=simple
 User=kamish
 Group=kamish
-SupplementaryGroups=audio dialout netdev bluetooth video
+SupplementaryGroups=audio dialout netdev bluetooth video input
 
 WorkingDirectory=/opt/kamish
 ExecStart=/opt/kamish/bin/kamish-core
@@ -44,6 +44,7 @@ DevicePolicy=closed
 DeviceAllow=/dev/snd/* rw
 DeviceAllow=/dev/bus/usb/* rw
 DeviceAllow=/dev/rfkill rw
+DeviceAllow=/dev/input/* rw
 
 # Capabilities required for low-latency audio and network control
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_NET_ADMIN CAP_SYS_NICE
