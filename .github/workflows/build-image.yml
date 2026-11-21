@@ -26,32 +26,9 @@ on:
         required: false
         default: false
         type: boolean
-  push:
-    branches:
-      - main
-    paths:
-      - "crates/**"
-      - "database/**"
-      - "Cargo.toml"
-      - "Cargo.lock"
-      - "firmware/Dockerfile"
-      - "firmware/docker-compose.yml"
-      - "firmware/buildroot-external-kamish/configs/**"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/linux.fragment"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/bootloader/**"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/users.table"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/**"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/rauc/**"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/genimage.cfg"
-      - "firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/boot.cmd"
-      - "firmware/scripts/**"
-      - "scripts/fetch-buildroot.sh"
-      - "scripts/repack-image.sh"
-      - "scripts/verify-image.sh"
-      - ".github/workflows/build-base-os.yml"
-      - ".github/workflows/build-image.yml"
-    tags:
-      - "v*"
+  release:
+    types:
+      - published
 
 permissions:
   contents: write
