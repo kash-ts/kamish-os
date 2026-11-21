@@ -42,9 +42,9 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess }) => {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col justify-center items-center px-4 py-12">
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center px-4 py-12">
       <div className="w-full max-w-sm">
-        <div className="bg-white rounded-none shadow-[0_15px_35px_rgba(0,0,0,0.35)] overflow-hidden">
+        <div className="bg-white border border-slate-200/80 rounded-xl shadow-xs overflow-hidden">
           <div className="px-6 border-b border-slate-100">
             <h2 className="text-base font-semibold text-slate-900">
               Вход в панель управления
