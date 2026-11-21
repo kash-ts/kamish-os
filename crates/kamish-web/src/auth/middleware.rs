@@ -32,12 +32,18 @@ pub async fn auth_middleware(
 
     let path = req.uri().path();
 
-    // 2. Whitelisted endpoints that never require authentication
-    if path == "/api/v1/status"
-        || path == "/v1/status"
-        || path == "/api/v1/auth/login"
-        || path == "/v1/auth/login"
-    {
+    // 2. Whitelisted endpoints that never require authentication.
+    // Note: Axum `.nest("/api/v1", ...)` strips the prefix before middleware runs,
+    // so `path` is `/auth/login` or `/status` (keep prefixed paths as fallback).
+    if matches!(
+        path,
+        "/status"
+            | "/api/v1/status"
+            | "/v1/status"
+            | "/auth/login"
+            | "/api/v1/auth/login"
+            | "/v1/auth/login"
+    ) {
         return Ok(next.run(req).await);
     }
 
@@ -63,12 +69,18 @@ pub async fn auth_middleware(
 
     // 5. Enforce password change requirement
     if user.must_change_password {
-        let is_auth_endpoint = path == "/api/v1/auth/change-password"
-            || path == "/v1/auth/change-password"
-            || path == "/api/v1/auth/session"
-            || path == "/v1/auth/session"
-            || path == "/api/v1/auth/logout"
-            || path == "/v1/auth/logout";
+        let is_auth_endpoint = matches!(
+            path,
+            "/auth/change-password"
+                | "/api/v1/auth/change-password"
+                | "/v1/auth/change-password"
+                | "/auth/session"
+                | "/api/v1/auth/session"
+                | "/v1/auth/session"
+                | "/auth/logout"
+                | "/api/v1/auth/logout"
+                | "/v1/auth/logout"
+        );
 
         if !is_auth_endpoint {
             return Err(AppError::PasswordChangeRequired(
