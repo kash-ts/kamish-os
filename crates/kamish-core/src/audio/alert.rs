@@ -140,8 +140,15 @@ pub async fn play_alert_tone(alert_type: AlertType) {
         }
 
         // Try players in order of preference for embedded Linux / desktop
+        let mut aplay_args = vec!["-q".to_string()];
+        if let Some(dev) = super::devices::selected_output() {
+            aplay_args.push("-D".to_string());
+            aplay_args.push(dev);
+        }
+        aplay_args.push(temp_path.to_str().unwrap().to_string());
+        let aplay_args: Vec<&str> = aplay_args.iter().map(String::as_str).collect();
         let players = [
-            ("aplay", vec!["-q", temp_path.to_str().unwrap()]),
+            ("aplay", aplay_args),
             ("pw-play", vec![temp_path.to_str().unwrap()]),
             ("paplay", vec![temp_path.to_str().unwrap()]),
             (

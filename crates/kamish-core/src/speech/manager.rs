@@ -323,6 +323,13 @@ impl SpeechManager {
             }
 
             let path_str = temp_path.to_string_lossy().to_string();
+            let selected_output = crate::audio::devices::selected_output();
+            let mut aplay_args: Vec<&str> = vec!["-q"];
+            if let Some(dev) = selected_output.as_deref() {
+                aplay_args.push("-D");
+                aplay_args.push(dev);
+            }
+            aplay_args.push(&path_str);
             let players: Vec<(&str, Vec<&str>)> = if is_mp3 {
                 vec![
                     ("mpv", vec!["--no-terminal", "--really-quiet", &path_str]),
@@ -331,7 +338,7 @@ impl SpeechManager {
                 ]
             } else {
                 vec![
-                    ("aplay", vec!["-q", &path_str]),
+                    ("aplay", aplay_args),
                     ("pw-play", vec![&path_str]),
                     ("paplay", vec![&path_str]),
                     ("mpv", vec!["--no-terminal", "--really-quiet", &path_str]),

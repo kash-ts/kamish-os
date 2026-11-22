@@ -141,7 +141,7 @@ impl SetupRepository {
             match step {
                 "network" => "audio",
                 "audio" => "voice",
-                "voice" => "ai",
+                "voice" => "completed",
                 _ => step,
             }
         } else {

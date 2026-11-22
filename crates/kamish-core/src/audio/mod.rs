@@ -3,6 +3,7 @@
 //! Bluetooth A2DP Sink routing, system mixer, and alert notifications.
 
 pub mod alert;
+pub mod devices;
 pub mod output;
 
 pub use output::{AudioOutputManager, AudioRoute, DEFAULT_SAFE_VOLUME_CEILING};

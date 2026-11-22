@@ -73,6 +73,74 @@ impl RequestHandler for CoreIpcHandler {
                     "max_volume": DEFAULT_SAFE_VOLUME_CEILING,
                 }))
             }
+            CoreRequest::SetVolumeCeiling { ceiling } => {
+                // The ceiling can be lowered by the user but never above the hard 85% limit.
+                let safe_ceiling = ceiling.clamp(1, DEFAULT_SAFE_VOLUME_CEILING);
+                self.state.audio.set_safe_ceiling(safe_ceiling);
+                CoreResponse::ok(serde_json::json!({
+                    "success": true,
+                    "requested_volume": self.state.audio.get_volume(),
+                    "applied_volume": self.state.audio.get_volume(),
+                    "safe_ceiling": safe_ceiling,
+                }))
+            }
+            CoreRequest::ListAudioDevices => {
+                // Restore the persisted selection after a restart.
+                for (kind, key) in [
+                    ("output", "audio:output_device"),
+                    ("input", "audio:input_device"),
+                ] {
+                    let current = if kind == "output" {
+                        crate::audio::devices::selected_output()
+                    } else {
+                        crate::audio::devices::selected_input()
+                    };
+                    if current.is_none() {
+                        if let Ok(Some((val,))) = sqlx::query_as::<_, (String,)>(
+                            "SELECT value FROM device_state WHERE key = ?",
+                        )
+                        .bind(key)
+                        .fetch_optional(&self.state.db)
+                        .await
+                        {
+                            crate::audio::devices::set_selected(kind, &val);
+                        }
+                    }
+                }
+                CoreResponse::ok(crate::audio::devices::list_devices().await)
+            }
+            CoreRequest::SetAudioDevice { kind, id } => {
+                if !crate::audio::devices::set_selected(&kind, &id) {
+                    return CoreResponse::err(
+                        "validation_error",
+                        "kind должен быть 'output' или 'input'",
+                    );
+                }
+                let key = format!("audio:{kind}_device");
+                let _ = sqlx::query(
+                    r#"
+                    INSERT INTO device_state (key, value, updated_at)
+                    VALUES (?, ?, ?)
+                    ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at
+                    "#,
+                )
+                .bind(&key)
+                .bind(&id)
+                .bind(chrono::Utc::now().to_rfc3339())
+                .execute(&self.state.db)
+                .await;
+                CoreResponse::ok(serde_json::json!({ "kind": kind, "id": id }))
+            }
+            CoreRequest::PlayTestTone => {
+                if self.state.audio.is_muted() {
+                    return CoreResponse::err("audio_muted", "Звук отключён");
+                }
+                self.state
+                    .audio
+                    .play_test_tone(crate::audio::alert::AlertType::Reminder)
+                    .await;
+                CoreResponse::ok(serde_json::json!({ "status": "played" }))
+            }
             CoreRequest::PlayTrack { title, uri, artist } => {
                 let mut t = crate::music::models::Track::new(
                     &title,
@@ -338,6 +406,10 @@ impl RequestHandler for CoreIpcHandler {
                     Err(e) => CoreResponse::err("network_error", e.to_string()),
                 }
             }
+            CoreRequest::DisconnectWifi => match self.state.network.disconnect_wifi().await {
+                Ok(res) => CoreResponse::ok(res),
+                Err(e) => CoreResponse::err("network_error", e.to_string()),
+            },
             CoreRequest::StartSetupAp => match self.state.network.start_ap().await {
                 Ok(res) => CoreResponse::ok(res),
                 Err(e) => CoreResponse::err("network_error", e.to_string()),
@@ -424,6 +496,7 @@ impl RequestHandler for CoreIpcHandler {
             }
             CoreRequest::CompleteSetupStep { step, data } => {
                 let step_name = match step {
+                    0 => "auth",
                     1 => "network",
                     2 => "audio",
                     3 => "voice",
@@ -441,6 +514,18 @@ impl RequestHandler for CoreIpcHandler {
                     "step": step_name,
                     "status": "completed"
                 }))
+            }
+
+            CoreRequest::CompleteSetup => {
+                match crate::setup::SetupRepository::set_setup_completed(&self.state.db, true).await
+                {
+                    Ok(at) => CoreResponse::ok(serde_json::json!({
+                        "status": "completed",
+                        "is_completed": true,
+                        "completed_at": at,
+                    })),
+                    Err(e) => CoreResponse::err("setup_error", e.to_string()),
+                }
             }
 
             // System operations

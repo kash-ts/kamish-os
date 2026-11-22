@@ -25,6 +25,7 @@ pub async fn save_setup_step_handler(
         n as u8
     } else if let Some(s) = payload.step.as_str() {
         match s {
+            "auth" => 0,
             "network" => 1,
             "audio" => 2,
             "voice" => 3,
@@ -41,6 +42,11 @@ pub async fn save_setup_step_handler(
             data: payload.data.unwrap_or(serde_json::Value::Null),
         })
         .await?;
+    Ok((StatusCode::OK, Json(res)))
+}
+
+pub async fn complete_setup_handler(State(state): State<WebState>) -> WebResult<impl IntoResponse> {
+    let res = state.call_core(CoreRequest::CompleteSetup).await?;
     Ok((StatusCode::OK, Json(res)))
 }
 

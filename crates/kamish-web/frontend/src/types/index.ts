@@ -597,7 +597,7 @@ export interface ChangePasswordResponse {
 // -----------------------------------------------------------------------------
 // Setup Wizard & Degradation Recovery Types (Requirement R2)
 // -----------------------------------------------------------------------------
-export type SetupStepId = 'network' | 'audio' | 'voice' | 'ai';
+export type SetupStepId = 'auth' | 'network' | 'audio' | 'voice' | 'ai';
 
 export interface SetupStepNetwork {
   status: 'pending' | 'ok' | 'error';
@@ -670,3 +670,15 @@ export interface SimulateDegradationResponse {
   recovery_step: SetupStepId;
 }
 
+
+export interface AudioDevice {
+  id: string;
+  name: string;
+}
+
+export interface AudioDevicesResponse {
+  outputs: AudioDevice[];
+  inputs: AudioDevice[];
+  selected_output: string;
+  selected_input: string;
+}

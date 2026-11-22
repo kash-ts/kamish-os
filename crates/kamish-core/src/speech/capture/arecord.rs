@@ -36,7 +36,9 @@ impl ArecordAudioSource {
 
     /// Read the ALSA capture device from the environment, defaulting to `default`.
     pub fn from_env() -> Self {
-        let device = std::env::var("KAMISH_MIC_DEVICE").unwrap_or_else(|_| "default".to_string());
+        let device = crate::audio::devices::selected_input().unwrap_or_else(|| {
+            std::env::var("KAMISH_MIC_DEVICE").unwrap_or_else(|_| "default".to_string())
+        });
         Self::new(device)
     }
 

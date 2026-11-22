@@ -36,6 +36,16 @@ pub enum CoreRequest {
     SetVolume {
         volume: u8,
     },
+    SetVolumeCeiling {
+        ceiling: u8,
+    },
+    ListAudioDevices,
+    SetAudioDevice {
+        /// `"output"` or `"input"`
+        kind: String,
+        id: String,
+    },
+    PlayTestTone,
     PlayTrack {
         title: String,
         uri: Option<String>,
@@ -122,6 +132,7 @@ pub enum CoreRequest {
         ssid: String,
         password: Option<String>,
     },
+    DisconnectWifi,
     StartSetupAp,
     StopSetupAp,
 
@@ -150,6 +161,7 @@ pub enum CoreRequest {
         step: u8,
         data: serde_json::Value,
     },
+    CompleteSetup,
 
     // System Operations
     TriggerReboot,

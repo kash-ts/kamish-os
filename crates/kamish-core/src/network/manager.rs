@@ -393,7 +393,8 @@ impl NetworkManager {
     pub async fn scan_wifi(&self) -> WifiScanResponse {
         info!("Scanning for Wi-Fi access points...");
 
-        let res = tokio::process::Command::new("nmcli")
+        // 1. Try scanning with active rescan first
+        let mut out = tokio::process::Command::new("nmcli")
             .args([
                 "-t",
                 "-f",
@@ -401,17 +402,58 @@ impl NetworkManager {
                 "dev",
                 "wifi",
                 "list",
+                "--rescan",
+                "yes",
             ])
             .output()
-            .await;
+            .await
+            .ok();
 
-        if let Ok(out) = res {
+        // 2. If --rescan yes failed or not supported, try standard list
+        if out.as_ref().map(|o| !o.status.success()).unwrap_or(true) {
+            out = tokio::process::Command::new("nmcli")
+                .args([
+                    "-t",
+                    "-f",
+                    "SSID,BSSID,SIGNAL,SECURITY,CHAN",
+                    "dev",
+                    "wifi",
+                    "list",
+                ])
+                .output()
+                .await
+                .ok();
+        }
+
+        // 3. Fallback to `dev wifi` without `list`
+        if out.as_ref().map(|o| !o.status.success()).unwrap_or(true) {
+            out = tokio::process::Command::new("nmcli")
+                .args(["-t", "-f", "SSID,BSSID,SIGNAL,SECURITY,CHAN", "dev", "wifi"])
+                .output()
+                .await
+                .ok();
+        }
+
+        let mut networks: Vec<WifiNetwork> = Vec::new();
+
+        if let Some(out) = out {
             if out.status.success() {
                 let text = String::from_utf8_lossy(&out.stdout);
-                let mut networks: Vec<WifiNetwork> = Vec::new();
                 for line in text.lines() {
                     let parts = parse_nmcli_terse_line(line);
-                    if parts.len() >= 5 && !parts[0].trim().is_empty() {
+                    let (ssid, bssid, signal_percent, security, channel) = if parts.len() >= 10 {
+                        // nmcli did not escape colons in MAC address (BSSID takes 6 parts)
+                        let ssid = parts[0].trim().to_string();
+                        let bssid = parts[1..7].join(":");
+                        let signal_percent = parts[7].trim().parse().unwrap_or(50);
+                        let security = if parts[8].trim().is_empty() {
+                            "Open".to_string()
+                        } else {
+                            parts[8].trim().to_string()
+                        };
+                        let channel = parts[9].trim().parse().unwrap_or(1);
+                        (ssid, bssid, signal_percent, security, channel)
+                    } else if parts.len() >= 5 {
                         let ssid = parts[0].trim().to_string();
                         let bssid = parts[1].trim().to_string();
                         let signal_percent = parts[2].trim().parse().unwrap_or(50);
@@ -421,38 +463,56 @@ impl NetworkManager {
                             parts[3].trim().to_string()
                         };
                         let channel = parts[4].trim().parse().unwrap_or(1);
+                        (ssid, bssid, signal_percent, security, channel)
+                    } else {
+                        continue;
+                    };
 
-                        // Keep strongest signal if same SSID appears on multiple channels
-                        if let Some(existing) = networks.iter_mut().find(|n| n.ssid == ssid) {
-                            if signal_percent > existing.signal_percent {
-                                existing.signal_percent = signal_percent;
-                                existing.bssid = bssid;
-                                existing.security = security;
-                                existing.channel = channel;
-                            }
-                        } else {
-                            networks.push(WifiNetwork {
-                                ssid,
-                                bssid,
-                                signal_percent,
-                                security,
-                                channel,
-                            });
+                    // Skip empty or hidden SSIDs
+                    if ssid.is_empty() || ssid == "--" {
+                        continue;
+                    }
+
+                    // Keep strongest signal if same SSID appears on multiple channels
+                    if let Some(existing) = networks.iter_mut().find(|n| n.ssid == ssid) {
+                        if signal_percent > existing.signal_percent {
+                            existing.signal_percent = signal_percent;
+                            existing.bssid = bssid;
+                            existing.security = security;
+                            existing.channel = channel;
                         }
+                    } else {
+                        networks.push(WifiNetwork {
+                            ssid,
+                            bssid,
+                            signal_percent,
+                            security,
+                            channel,
+                        });
                     }
                 }
-                return WifiScanResponse {
-                    count: networks.len(),
-                    networks,
-                };
             }
         }
 
-        // Exclusively actual information: return empty if no Wi-Fi networks detected
-        WifiScanResponse {
-            count: 0,
-            networks: vec![],
+        // 4. Ensure currently active Wi-Fi connection is always in the list
+        let state = self.state.read().await;
+        if let Some(ref active_ssid) = state.wifi_ssid {
+            if !active_ssid.is_empty() && !networks.iter().any(|n| n.ssid == *active_ssid) {
+                networks.insert(
+                    0,
+                    WifiNetwork {
+                        ssid: active_ssid.clone(),
+                        bssid: state.wifi_bssid.clone().unwrap_or_default(),
+                        signal_percent: state.wifi_signal_percent.unwrap_or(85),
+                        security: "WPA2".to_string(),
+                        channel: 1,
+                    },
+                );
+            }
         }
+
+        let count = networks.len();
+        WifiScanResponse { count, networks }
     }
 
     pub async fn connect_wifi(&self, req: WifiConnectRequest) -> AppResult<WifiConnectResponse> {

@@ -7,6 +7,7 @@ import type {
   AiReadiness,
   Alarm,
   AudioRoute,
+  AudioDevicesResponse,
   BluetoothScanResponse,
   BluetoothStatus,
   CreateAlarmRequest,
@@ -938,3 +939,19 @@ export async function playAudioTest(): Promise<{ status: string }> {
 }
 
 
+
+export async function getAudioDevices(): Promise<AudioDevicesResponse> {
+  const res = await apiFetch(`/audio/devices`, {
+    headers: { Accept: 'application/json' },
+  });
+  return handleResponse<AudioDevicesResponse>(res);
+}
+
+export async function setAudioDevice(kind: 'output' | 'input', id: string): Promise<{ kind: string; id: string }> {
+  const res = await apiFetch(`/audio/device`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ kind, id }),
+  });
+  return handleResponse<{ kind: string; id: string }>(res);
+}

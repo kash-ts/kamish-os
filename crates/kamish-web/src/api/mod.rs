@@ -42,6 +42,13 @@ pub fn create_router(state: WebState) -> Router {
         // Audio
         .route("/audio/status", get(audio::get_audio_status))
         .route("/audio/volume", post(audio::set_volume_handler))
+        .route("/audio/ceiling", post(audio::set_ceiling_handler))
+        .route("/audio/devices", get(audio::list_devices_handler))
+        .route("/audio/device", post(audio::set_device_handler))
+        .route("/audio/test", post(audio::test_tone_handler))
+        .route("/system/audio/volume", post(audio::set_volume_handler))
+        .route("/system/audio/ceiling", post(audio::set_ceiling_handler))
+        .route("/system/audio/test", post(audio::test_tone_handler))
         // Alarms
         .route(
             "/alarms",
@@ -85,8 +92,20 @@ pub fn create_router(state: WebState) -> Router {
         .route("/speech/capture/stop", post(speech::stop_capture_handler))
         // Network
         .route("/network/status", get(network::get_network_status))
-        .route("/network/scan", post(network::scan_wifi_handler))
+        .route(
+            "/network/scan",
+            get(network::scan_wifi_handler).post(network::scan_wifi_handler),
+        )
         .route("/network/connect", post(network::connect_wifi_handler))
+        .route(
+            "/network/wifi/scan",
+            get(network::scan_wifi_handler).post(network::scan_wifi_handler),
+        )
+        .route("/network/wifi/connect", post(network::connect_wifi_handler))
+        .route(
+            "/network/wifi/disconnect",
+            post(network::disconnect_wifi_handler),
+        )
         .route("/network/ap/start", post(network::start_ap_handler))
         .route("/network/ap/stop", post(network::stop_ap_handler))
         // Bluetooth
@@ -108,6 +127,7 @@ pub fn create_router(state: WebState) -> Router {
         // Setup
         .route("/setup/status", get(setup::get_setup_status_handler))
         .route("/setup/step", post(setup::save_setup_step_handler))
+        .route("/setup/complete", post(setup::complete_setup_handler))
         .route("/setup/diagnostics", post(setup::run_diagnostics_handler))
         // AI
         .route("/ai/prompt", post(ai::prompt_handler))

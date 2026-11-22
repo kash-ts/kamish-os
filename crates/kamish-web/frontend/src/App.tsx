@@ -3,7 +3,6 @@ import { Sidebar, type NavPage } from './components/Sidebar';
 import { TopHeader } from './components/TopHeader';
 import { ConnectionLostModal } from './components/ConnectionLostModal';
 import { LoginPage } from './pages/LoginPage';
-import { ChangePasswordPage } from './pages/ChangePasswordPage';
 import { SetupWizardPage } from './pages/SetupWizardPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { SystemPage } from './pages/SystemPage';
@@ -106,7 +105,10 @@ export const App: React.FC = () => {
 
       if (setupRes) {
         setSetupStatus(setupRes);
-        if (!setupRes.is_completed || setupRes.degraded_components.length > 0) {
+        if (
+          !setupRes.is_completed ||
+          setupRes.degraded_components.some((d) => d.component !== 'ai')
+        ) {
           setShowSetupWizard(true);
         } else {
           setShowSetupWizard(false);
@@ -261,26 +263,18 @@ export const App: React.FC = () => {
     );
   }
 
-  // 3. Authenticated but initial password change required
-  if (mustChangePassword) {
-    return (
-      <ChangePasswordPage
-        onPasswordChanged={() => {
-          setMustChangePassword(false);
-          checkSession();
-          refreshAll();
-        }}
-      />
-    );
-  }
-
-  // 4. Initial Setup Wizard (if not yet completed or recovering degraded component)
-  if (showSetupWizard) {
+  // 3. Initial Setup Wizard (if not yet completed, recovering degraded component, or password change required)
+  if (showSetupWizard || mustChangePassword) {
     return (
       <>
         <SetupWizardPage
           onSetupComplete={handleSetupComplete}
-          onForcedPasswordRequired={handleForcedPasswordRequired}
+          mustChangePassword={mustChangePassword}
+          onPasswordChanged={() => {
+            setMustChangePassword(false);
+            checkSession();
+            refreshAll();
+          }}
         />
         {!isCoreConnected && (
           <ConnectionLostModal onRetry={refreshAll} isRetrying={isLoading} />

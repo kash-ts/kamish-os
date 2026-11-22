@@ -33,6 +33,13 @@ pub async fn connect_wifi_handler(
     Ok((StatusCode::OK, Json(res)))
 }
 
+pub async fn disconnect_wifi_handler(
+    State(state): State<WebState>,
+) -> WebResult<impl IntoResponse> {
+    let res = state.call_core(CoreRequest::DisconnectWifi).await?;
+    Ok((StatusCode::OK, Json(res)))
+}
+
 pub async fn start_ap_handler(State(state): State<WebState>) -> WebResult<impl IntoResponse> {
     let res = state.call_core(CoreRequest::StartSetupAp).await?;
     Ok((StatusCode::OK, Json(res)))

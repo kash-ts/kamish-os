@@ -52,6 +52,7 @@ export const NetworkPage: React.FC = () => {
 
   useEffect(() => {
     refreshAll();
+    handleScan();
   }, []);
 
   const handleScan = async () => {
