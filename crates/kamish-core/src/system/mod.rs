@@ -1,5 +1,6 @@
 pub mod events;
 pub mod hardware;
+pub mod led;
 pub mod power_button;
 pub mod ssh;
 pub mod update;
@@ -10,6 +11,7 @@ pub use hardware::{
     parse_asound_cards, parse_sysfs_temperature, read_cpu_freq_mhz, read_cpu_temperature,
     read_storage_usage, AudioRoutingInfo, HardwareTelemetry, RespeakerInfo,
 };
+pub use led::{LedController, LedPattern};
 use serde::Serialize;
 pub use ssh::{get_ssh_status, toggle_ssh, SshStatus, SshToggleRequest, SshToggleResponse};
 use sysinfo::System;

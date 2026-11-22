@@ -58,6 +58,43 @@ pub async fn start_core_daemon(config: &Config) -> AppResult<(CoreState, IpcServ
         }
     });
 
+    // Spawn diagnostic LED worker
+    let led = std::sync::Arc::new(system::LedController::new());
+    let initial_pattern = if state.setup.is_completed().await.unwrap_or(false) {
+        system::LedPattern::Ready
+    } else {
+        system::LedPattern::SetupAp
+    };
+    let led_pattern = std::sync::Arc::new(tokio::sync::RwLock::new(initial_pattern));
+    let led_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
+    led.start_worker(led_pattern.clone(), led_running.clone());
+
+    // Connect LED state to system events
+    let mut led_events = state.events.subscribe();
+    let pattern_ref = led_pattern.clone();
+    tokio::spawn(async move {
+        while let Ok(bus_event) = led_events.recv().await {
+            match bus_event.event.as_str() {
+                "hardware_warning" => {
+                    *pattern_ref.write().await = system::LedPattern::Error;
+                }
+                "setup_step_updated" => {
+                    *pattern_ref.write().await = system::LedPattern::SetupAp;
+                }
+                "setup_completed" => {
+                    *pattern_ref.write().await = system::LedPattern::Ready;
+                }
+                "wakeword_detected" => {
+                    *pattern_ref.write().await = system::LedPattern::Listening;
+                }
+                "speech_completed" => {
+                    *pattern_ref.write().await = system::LedPattern::Ready;
+                }
+                _ => {}
+            }
+        }
+    });
+
     // Spawn hardware power button gesture monitor (1 click: shutdown, 3 clicks: factory reset)
     system::power_button::start_power_button_monitor(state.clone());
 

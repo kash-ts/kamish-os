@@ -635,6 +635,22 @@ impl NetworkManager {
         let ssid = state.ap_ssid.clone();
         let gateway_ip = state.ap_gateway_ip.clone();
 
+        if std::env::var("KAMISH_MOCK_HARDWARE").is_err() && !crate::audio::alert::is_audio_muted()
+        {
+            let res = tokio::process::Command::new("nmcli")
+                .args(["connection", "up", "Kamish-Setup"])
+                .output()
+                .await;
+            if let Ok(out) = res {
+                if !out.status.success() {
+                    warn!(
+                        "nmcli connection up Kamish-Setup: {}",
+                        String::from_utf8_lossy(&out.stderr)
+                    );
+                }
+            }
+        }
+
         if let Some(bus) = &self.event_bus {
             bus.emit(
                 "network_state",
@@ -658,6 +674,14 @@ impl NetworkManager {
 
         let mut state = self.state.write().await;
         state.ap_active = false;
+
+        if std::env::var("KAMISH_MOCK_HARDWARE").is_err() && !crate::audio::alert::is_audio_muted()
+        {
+            let _ = tokio::process::Command::new("nmcli")
+                .args(["connection", "down", "Kamish-Setup"])
+                .output()
+                .await;
+        }
 
         if let Some(bus) = &self.event_bus {
             bus.emit(

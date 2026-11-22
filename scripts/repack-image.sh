@@ -174,6 +174,15 @@ ${SUDO} chmod 0644 \
     "${STAGING_ROOTFS}/etc/udev/rules.d/99-respeaker.rules" \
     "${STAGING_ROOTFS}/etc/systemd/system/"kamish*.service
 
+if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager"; then
+    ${SUDO} chown -R root:root "${STAGING_ROOTFS}/etc/NetworkManager"
+    ${SUDO} chmod 0755 "${STAGING_ROOTFS}/etc/NetworkManager"
+    if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager/system-connections"; then
+        ${SUDO} chmod 0700 "${STAGING_ROOTFS}/etc/NetworkManager/system-connections"
+        ${SUDO} find "${STAGING_ROOTFS}/etc/NetworkManager/system-connections" -type f -exec chmod 0600 {} + 2>/dev/null || true
+    fi
+fi
+
 if [[ -n "${RAUC_KEYRING}" ]]; then
     if [[ ! -f "${RAUC_KEYRING}" ]]; then
         echo "ERROR: RAUC keyring not found: ${RAUC_KEYRING}" >&2
