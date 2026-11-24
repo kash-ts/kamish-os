@@ -183,9 +183,9 @@ if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager"; then
     fi
 fi
 
-if ${SUDO} test -d "${STAGING_ROOTFS}/lib/firmware"; then
-    ${SUDO} chown -R root:root "${STAGING_ROOTFS}/lib/firmware"
-    ${SUDO} chmod -R a+rX "${STAGING_ROOTFS}/lib/firmware"
+if ${SUDO} test -d "${STAGING_ROOTFS}/usr/lib/firmware"; then
+    ${SUDO} chown -R root:root "${STAGING_ROOTFS}/usr/lib/firmware"
+    ${SUDO} chmod -R a+rX "${STAGING_ROOTFS}/usr/lib/firmware"
 fi
 
 if [[ -n "${RAUC_KEYRING}" ]]; then
