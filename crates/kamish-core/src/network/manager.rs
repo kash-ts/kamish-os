@@ -4,7 +4,7 @@ use crate::system::EventBus;
 use serde_json::json;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::info;
+use tracing::{info, warn};
 
 #[derive(Debug)]
 struct NetworkInnerState {

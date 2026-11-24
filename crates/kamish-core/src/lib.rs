@@ -60,7 +60,10 @@ pub async fn start_core_daemon(config: &Config) -> AppResult<(CoreState, IpcServ
 
     // Spawn diagnostic LED worker
     let led = std::sync::Arc::new(system::LedController::new());
-    let initial_pattern = if state.setup.is_completed().await.unwrap_or(false) {
+    let initial_pattern = if crate::setup::SetupRepository::is_setup_completed(&state.db)
+        .await
+        .unwrap_or(false)
+    {
         system::LedPattern::Ready
     } else {
         system::LedPattern::SetupAp

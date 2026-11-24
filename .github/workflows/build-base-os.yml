@@ -35,7 +35,7 @@ concurrency:
 jobs:
   build-base-os:
     name: Build Buildroot Base OS (Orange Pi 4 Pro)
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-arm
     timeout-minutes: 180
     outputs:
       artifact_name: ${{ steps.pack.outputs.artifact_name }}
