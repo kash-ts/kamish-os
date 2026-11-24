@@ -183,6 +183,17 @@ if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager"; then
     fi
 fi
 
+if ${SUDO} test -f "${STAGING_ROOTFS}/etc/modules"; then
+    ${SUDO} chown root:root "${STAGING_ROOTFS}/etc/modules"
+    ${SUDO} chmod 0644 "${STAGING_ROOTFS}/etc/modules"
+fi
+
+if ${SUDO} test -d "${STAGING_ROOTFS}/etc/modules-load.d"; then
+    ${SUDO} chown -R root:root "${STAGING_ROOTFS}/etc/modules-load.d"
+    ${SUDO} chmod 0755 "${STAGING_ROOTFS}/etc/modules-load.d"
+    ${SUDO} find "${STAGING_ROOTFS}/etc/modules-load.d" -type f -exec chmod 0644 {} + 2>/dev/null || true
+fi
+
 if ${SUDO} test -d "${STAGING_ROOTFS}/usr/lib/firmware"; then
     ${SUDO} chown -R root:root "${STAGING_ROOTFS}/usr/lib/firmware"
     ${SUDO} chmod -R a+rX "${STAGING_ROOTFS}/usr/lib/firmware"

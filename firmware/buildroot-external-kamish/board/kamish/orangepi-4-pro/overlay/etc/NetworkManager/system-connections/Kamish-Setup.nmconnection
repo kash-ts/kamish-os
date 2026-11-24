@@ -9,8 +9,7 @@ autoconnect-priority=0
 [wifi]
 mode=ap
 ssid=Kamish-Setup
-
-[wifi-security]
+band=bg
 
 [ipv4]
 address1=192.168.4.1/24
