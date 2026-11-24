@@ -103,7 +103,7 @@
 
 ```bash
 wsl
-cd /mnt/m/Project/Kamish-os/radiant-bardeen
+cd /mnt/m/Project/kamish-os
 export CARGO_TARGET_DIR=$HOME/.cache/kamish-target   # не в /mnt — там медленно
 cargo check --workspace --all-targets
 ```
@@ -127,23 +127,23 @@ quoted string`; или JSON-кавычки «съедаются».
 wsl -e sh -lc "curl -d '{\"a\":\"b\"}' ..."
 
 # хорошо: скрипт в репозитории, запуск файлом
-wsl -e sh /mnt/m/Project/Kamish-os/radiant-bardeen/scripts/проверка.sh
+wsl -e sh /mnt/m/Project/kamish-os/scripts/проверка.sh
 ```
 
-### 3.3. PowerShell может склеить файл в одну строку
+### 3.3. Переводы строк CRLF против LF и порча файлов в Windows
 
-**Симптом:** `cargo test` пишет `running 0 tests` для файла, где тесты точно есть.
+**Симптом 1:** `/bin/sh: ./script.sh: /bin/bash^M: bad interpreter: No such file or directory` или ошибки парсинга Make-файлов / Buildroot.
+**Симптом 2:** `cargo test` пишет `running 0 tests` для файла, где тесты точно есть.
 
-**Причина:** `Set-Content` без `-Raw`/с неправильными переводами строк схлопывает
-файл в одну строку. Rust такое иногда проглатывает без ошибки.
+**Причина:** Редакторы в Windows или PowerShell (`Set-Content` без `-Raw`) переводят концы строк в CRLF или схлопывают файл в одну строку. Скрипты Linux и компиляторы ломаются на невидимом байте `\r`.
 
-**Решение:** для правок файлов используйте `edit`/`write`, а не `Set-Content`.
-После `Set-Content` всегда проверяйте число строк:
-
-```powershell
-Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
-  if ((Get-Content $_.FullName).Count -le 2) { "ПОДОЗРИТЕЛЬНО: $($_.FullName)" }
-}
+**Решение:**
+- Всегда сохраняйте файлы строго в **LF** и **UTF-8 без BOM**.
+- Для правок файлов используйте агентские инструменты `edit`/`write`, а не `Set-Content`.
+- После ручных правок можно проверить окончания строк:
+```bash
+file scripts/*.sh | grep CRLF  # вывод должен быть пустым
+```
 ```
 
 ### 3.4. Сеть: не доверяйте одиночному `curl`
@@ -221,6 +221,10 @@ Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
 | Провайдер без бинарника | `is_available()` врёт | проверять `find_binary()` и тестировать оба исхода |
 | Тест проверяет заглушку | зелёный, но пути нет | прогонять через настоящий HTTP/CLI |
 | `async fn` в трейте | `Box<dyn Trait>` не собирается | использовать `BoxFuture<'_, T>` |
+| CRLF в скриптах/Make | `^M: bad interpreter` | сохранять строго в LF, UTF-8 no BOM |
+| Новые поля ломают старую БД/состояние | паника при десериализации | добавлять `#[serde(default)]` или `Option<T>` |
+| Ссылки на строки в доках | документация врёт через 2 коммита | ссылаться на имена структур, трейтов, методов |
+| Дебаг-принты в проде | спам в stdout/журнале systemd | использовать `tracing::{debug, trace}!`, удалять `println!` |
 | Обрезка файла при правке | `running 0 tests` | `edit` вместо `Set-Content`, проверка числа строк |
 | Кэш сборки в `/mnt` | сборка в 10 раз медленнее | `CARGO_TARGET_DIR=$HOME/.cache/...` |
 | Парсинг JSON через grep | тег = URL | якорить на поле: `grep -o '"tag_name"\s*:\s*"[^"]*"'` |
@@ -261,6 +265,10 @@ Get-ChildItem -Recurse -Include *.rs -File | ForEach-Object {
 [ ] Проверил через реальный API/CLI, а не только юнит-тестом
 [ ] Моки названы моками, флаги доступности отражают реальность
 [ ] Обновил docs/ (API.md, ARCHITECTURE.md), если изменился контракт
+[ ] Сохранил файлы строго в LF (без CRLF) и UTF-8 without BOM
+[ ] Новые поля структур снабжены #[serde(default)] или Option<T>
+[ ] В коде и документации нет ссылок на номера строк (только имена типов/методов)
+[ ] Нет временных println! и тестовых костылей в продакшн-модулях
 [ ] В отчёте есть числа, ограничения и команда проверки
 ```
 

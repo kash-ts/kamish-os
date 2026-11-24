@@ -1,112 +1,95 @@
-# AGENTS.md — Инструкции и правила для ИИ-агентов (AI Coding Guidelines)
+# AGENTS.md — Kamish OS Agent Instructions
 
-Этот документ определяет правила поведения, архитектурные инварианты, стандарты кодирования и протоколы верификации для ИИ-агентов (Antigravity, Cursor, Windsurf, Claude Code и др.), работающих в репозитории **«Камыш» (Kamish)**.
+AI coding guidelines, architectural invariants, and verification protocols for agents in the **Kamish** repository.
 
----
-
-## 1. Роль и ключевая миссия
-
-* **Роль:** Senior Embedded & Systems Rust Engineer / AI Pair Programmer.
-* **Миссия:** Развивать и поддерживать автономную встроенную умную колонку на базе микрокомпьютера ARM64 (Orange Pi 4 Pro / Allwinner A733), микрофонного массива **Seeed ReSpeaker XVF3800** и акустической системы **GT-112** под управлением **Kamish Linux (Buildroot)**.
-* **Единый источник правды (SSOT):**
-  * **Рабочий процесс агента: [`docs/AGENT_PLAYBOOK.md`](docs/AGENT_PLAYBOOK.md)** — обязательное чтение перед первой правкой
-  * Архитектура: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
-  * Техническая спецификация и SLA: [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md)
-  * Журнал архитектурных решений (ADR): [`docs/DECISIONS.md`](docs/DECISIONS.md)
-  * Дорожная карта и статус: [`docs/ROADMAP.md`](docs/ROADMAP.md)
-  * Спецификация API: [`docs/API.md`](docs/API.md)
-  * Аппаратные схемы и распиновка: [`docs/HARDWARE.md`](docs/HARDWARE.md)
-  * Очередь задач по кодовой базе: [`docs/CODE_TASKS.md`](docs/CODE_TASKS.md)
-
-> [!NOTE]
-> Этот документ задаёт **правила**. Как именно действовать, чтобы не переделывать,
-> описано в [`docs/AGENT_PLAYBOOK.md`](docs/AGENT_PLAYBOOK.md): цикл работы, грабли
-> окружения (WSL2, сборка, кавычки, сеть), правила эмуляции и чек-лист сдачи.
-> Перед началом работы прочитайте оба.
+> **Language Policy:** All user communication, clarifying questions, and final task reports MUST be written in **Russian**.
 
 ---
 
-## 2. Базовые принципы и правила ИИ-агента (Core Invariants)
+## 1. Mission & SSOT
 
-### 🔴 Категорически запрещено (NEVER)
-1. **Никаких утечек секретов:** Никогда не хардкодить, не логировать (stdout/stderr/tracing) и не отдавать в SPA-интерфейс/API приватные ключи VLESS, пароли Wi-Fi сетей (PSK), cookies или токены авторизации. Всегда маскировать секреты.
-2. **Никаких «галлюцинаций» аппаратуры:** Запрещено выдумывать успешные ответы отсутствующего физического железа. Если драйвер или плата недоступны в dev-окружении (x86_64), использовать строгие мок-интерфейсы (`MockAiClient`, `MockMpvPlayer`, симуляция VAD/вейкворда) и явно фиксировать ограничения в документации.
-3. **Никаких обходов Tool Registry:** Модель ИИ-оркестратора **не имеет** прямого доступа к Shell, системным файлам или секретам хоста. Вся работа с колонкой ведётся строго через типизированные инструменты (14 tools).
-4. **Никакого ухудшения тестов:** Запрещено отключать, комментировать (`#[ignore]`) или удалять существующие тесты для создания иллюзии работоспособности. Все тесты должны проходить зелёным цветом.
-5. **Никакого визуального мусора («AI Slop»):** SPA-интерфейс должен соответствовать правилам `kill-ai-slop`: строгий, функциональный дизайн без фиолетовых «нейросетевых» градиентов, смайликов в заголовках и избыточных декораций.
-6. **Запрет на облачные сервисы для STT и TTS:** Распознавание речи (STT) и синтез голоса (TTS) обязаны выполняться **строго локально на устройстве** (STT: Vosk, Sherpa-onnx, mock; TTS: Piper, RHVoice, автономный WAV-генератор/offline_fallback). Категорически запрещено использовать сторонние облачные Whisper или Cloud TTS API. При этом языковая модель (LLM через процесс Antigravity CLI `agy`) и стриминг музыки (YouTube Music) работают с облаком — прямое подключение облачных REST API в обход CLI `agy` запрещено.
-7. **Запрет на самовольный `git push`:** Категорически запрещено выполнять `git push` после внесения изменений без прямого требования пользователя. Все изменения по умолчанию остаются локальными до получения команды на публикацию.
-8. **Запрет на `git push` во время сборки `.img` без двойного подтверждения:** Если в CI уже идёт сборка образа диска (`.img`), перед любым `git push` (или перезапуском сборки) требуется **двойное подтверждение**: прямое требование пользователя И отдельное явное согласие на действие при активной сборке.
-9. **Запрет на локальные/стендовые скрипты и мусор в репозитории:** Категорически запрещено коммитить в Git одноразовые отладочные скрипты (диагностика контейнеров, временные тесты I/O), скрипты прошивки с персональными путями/устройствами или утилиты с захардкоженными IP-адресами и паролями. Все локальные вспомогательные скрипты разработчика обязаны размещаться строго в каталоге `temp/` (который добавлен в `.gitignore`).
-
-### 🟢 Обязательно к исполнению (ALWAYS)
-1. **Принцип Offline-First:** Базовые функции устройства (будильники, напоминания, локальный звук, системные статусы, веб-панель) обязаны работать автономно без интернета и облачного ИИ.
-2. **Защита акустики (Safe Volume Ceiling):** Программный максимум громкости зафиксирован на уровне **85%**. Не допускать превышения этого значения в коде аудио-менеджера.
-3. **Холодный запуск и экономия памяти:** Потребление памяти сервисами в состоянии покоя не должно превышать 60 МБ RSS. Использовать SQLite в режиме WAL с пулом соединений SQLx.
-4. **Сохранение целостности кода:** Сохранять существующие комментарии, документацию и форматирование. Делать точечные, атомарные изменения.
-5. **Политика публикации и сборки `.img`:** `git push` выполняется только по прямому требованию пользователя (с двойным подтверждением, если идёт сборка `.img`). Автоматическая сборка `.img` в CI выполняется **только при создании релиза** (`release: published`), а не при каждом push в `main`.
-6. **Изоляция локальных инструментов (`temp/`):** Любые локальные скрипты разработчика для работы с конкретной физической платой, отладки, прошивки флешек, тестов браузера и стендовых проверок должны находиться исключительно в директории `temp/`. Директория `temp/` полностью игнорируется Git и никогда не попадает в удалённый репозиторий.
+* **Role:** Senior Embedded & Systems Rust Engineer / AI Pair Programmer.
+* **Target:** Autonomous smart speaker: ARM64 (Orange Pi 4 Pro / Allwinner A733), Seeed ReSpeaker XVF3800 mic array, GT-112 audio, Kamish Linux (Buildroot).
+* **Single Source of Truth (SSOT):**
+  * Workflow playbook (read first): [`docs/AGENT_PLAYBOOK.md`](docs/AGENT_PLAYBOOK.md)
+  * Architecture & Specs: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`docs/SPECIFICATION.md`](docs/SPECIFICATION.md), [`docs/DECISIONS.md`](docs/DECISIONS.md)
+  * Hardware & Roadmap: [`docs/HARDWARE.md`](docs/HARDWARE.md), [`docs/ROADMAP.md`](docs/ROADMAP.md), [`docs/API.md`](docs/API.md), [`docs/CODE_TASKS.md`](docs/CODE_TASKS.md)
 
 ---
 
-## 3. Протокол разработки и верификации (Loop of Work)
+## 2. Invariants
 
-При решении любой задачи агент обязан следовать строгому четырёхшаговому циклу:
+### 🔴 NEVER
+1. **Leak secrets:** Never log, hardcode, or expose VLESS keys, Wi-Fi PSK, auth tokens, or cookies to API/UI. Mask all secrets.
+2. **Hallucinate hardware:** Never fake missing physical hardware. On x86_64 dev environments, use explicit mocks (`MockAiClient`, `MockMpvPlayer`, VAD/wakeword simulation) and document limitations.
+3. **Bypass Tool Registry:** The LLM orchestrator has NO direct shell/system access; use the 14 typed tools exclusively.
+4. **Degrade tests:** Never disable, comment out, or `#[ignore]` failing tests. All tests must pass green.
+5. **Add AI slop:** Keep UI strictly functional (`kill-ai-slop`: no violet gradients, no heading emoji, no superfluous fluff).
+6. **Use cloud STT/TTS:** Speech recognition (Vosk, Sherpa-onnx) and synthesis (Piper, RHVoice, tone generator) MUST run strictly local on-device. Never call cloud Whisper/TTS APIs. LLM via Antigravity CLI (`agy`) and music streaming are cloud-backed; never bypass `agy`.
+7. **Unauthorized `git push`:** Never push without explicit user request.
+8. **Push during `.img` build:** If CI `.img` build is active, require **double confirmation** before pushing or re-triggering.
+9. **Pollute repo with dev scripts:** Never commit one-off flash/debug scripts, container tests, or hardcoded IPs/passwords. Store developer scratch tools strictly in `temp/` (gitignored).
+10. **Leave debug artifacts in production code:** No `println!`/`eprintln!`, ad-hoc counters, or dummy fields in `kamish-core`, `kamish-web`, or `kamish-ipc`. Use structured `tracing::{trace, debug, info, warn, error}!`. Mocks belong in `tests/` or `#[cfg(test)]`.
+11. **Cite line numbers:** Never cite line numbers (`file.rs:120`) in code, comments, commits, or docs. Reference stable identifiers only (e.g. `AudioService::set_volume` in `crates/kamish-core/src/audio/manager.rs`).
+
+### 🟢 ALWAYS
+1. **Offline-first:** Core features (alarms, timers, local playback, system status, web UI) must work without WAN or cloud AI.
+2. **Acoustic safety:** Software volume ceiling is hard-capped at **85%**. Never bypass.
+3. **Low memory footprint:** Idle RAM must stay under 60 MB RSS. Use SQLite WAL mode with SQLx connection pooling.
+4. **Preserve code integrity:** Keep existing comments, docs, and conventions intact. Make focused, minimal edits.
+5. **Release-only `.img` CI:** Automated disk image builds run ONLY on published releases (`release: published`), not on every push.
+6. **File encoding (LF, no BOM):** Save all files (especially `.sh`, `.rs`, `.toml`, Make, Buildroot configs) as **UTF-8 without BOM** and **LF** line endings.
+7. **Async task safety:** Every `tokio::spawn` background task MUST support cooperative cancellation (`tokio_util::sync::CancellationToken`). Never hold cyclic strong `Arc<T>` references in persistent workers (use `Weak<T>` where needed) to ensure graceful shutdown and prevent memory leaks.
+8. **Backward-compatible state & schemas:** New fields in persistent structs (`device_state`, config, DTOs) MUST have `#[serde(default)]` or `Option<T>`. Database migrations must bump `PRAGMA user_version` without data corruption.
+9. **Commit hygiene:** Concise Conventional Commits (~50–70 chars). NO AI attribution trailers (`Co-Authored-By`, `Generated by AI`). Prefix `[ai]` or `chore(ai):` is strictly reserved for agent workflow/rules edits (`AGENTS.md`), forbidden in product code. Never create backup branches before rebase (rely on `git reflog`).
+
+---
+
+## 3. Workflow & Verification Loop
 
 ```text
-[1. Исследование] ───► [2. Реализация] ───► [3. Тестирование] ───► [4. Отчётность]
-  Чтение кода и         Точечные правки       cargo check / test     Итоговый отчёт
-  документации          без поломки API       cargo fmt              по шаблону
+[1. Explore] ──► [2. Implement] ──► [3. Verify] ──► [4. Report (Russian)]
+  Read SSOT/code   Minimal diffs      cargo/npm tests  Structured summary
 ```
 
-### Команды верификации качества:
-После внесения любых изменений в кодовую базу агент обязан выполнить:
+Run after every code modification:
 ```bash
-# 1. Проверка синтаксиса и типов Rust-воркспейса
-cargo check --workspace --all-targets
-
-# 2. Прогон всех модульных и интеграционных тестов
-cargo test --workspace
-
-# 3. Проверка форматирования кода Rust
+cargo check --workspace --all-targets && \
+cargo test --workspace && \
 cargo fmt --all -- --check
-
-# 4. Проверка сборки SPA-интерфейса (если затронут `crates/kamish-web/frontend/`)
+# If crates/kamish-web/frontend/ modified:
 cd crates/kamish-web/frontend && npm run build
 ```
 
-> [!IMPORTANT]
-> Если хотя бы один тест завершился с ошибкой, задача не считается выполненной. Агент обязан локализовать и устранить причину регрессии до отправки ответа пользователю.
-
 ---
 
-## 4. Архитектурная карта подсистем
+## 4. Subsystem Atlas
 
-| Подсистема | Путь в проекте | Ключевые технологии и особенности |
+| Subsystem | Path | Tech & Key Responsibility |
 |---|---|---|
-| **Домен (ядро)** | `crates/kamish-core/src/` | Rust, Tokio, Tracing; прикладная логика без HTTP |
-| **HTTP/WS + аутентификация** | `crates/kamish-web/src/` | Axum 0.8, роуты `api/`, Argon2id, сессии SQLite, cookie `kamish_session`, middleware |
-| **Мастер настройки** | `crates/kamish-core/src/setup/`, `crates/kamish-web/src/api/setup.rs` | Setup Wizard (5 этапов), хранение в `device_state`, диагностические пробы, WS события |
-| **База данных** | `crates/kamish-core/src/database/`, `crates/kamish-web/src/database.rs` | SQLite WAL, единая схема (PRAGMA user_version), пул SQLx |
-| **Планировщик** | `crates/kamish-core/src/scheduler/` | `SchedulerEngine`, поддержка Cron-подобных правил, Timezone, SQLite репозиторий |
-| **Аудио-алерты** | `crates/kamish-core/src/audio/alert.rs` | Автономный математический синтезатор WAV-тонов (без внешних зависимостей) |
-| **AI-оркестратор** | `crates/kamish-core/src/ai/` | Antigravity CLI процесс, сессии диалогов, реестр из 14 инструментов, `MockAiClient` |
-| **Мультимедиа** | `crates/kamish-core/src/music/` | Headless MPV через IPC UNIX-сокет, радио, рекомендации YouTube Music, mock-фоллбэк |
-| **Речь (Speech)** | `crates/kamish-core/src/speech/` | VAD на чистом Rust (RMS + ZCR), споттер ключевых слов, модульные STT/TTS |
-| **Системный стек** | `crates/kamish-core/src/{system,network,bluetooth,vpn}/` | Bluetooth A2DP (BlueZ), Wi-Fi (nmcli), Setup AP, Happ VLESS Reality, шина событий WS |
-| **Аппаратура** | `crates/kamish-core/src/system/hardware.rs` | Мониторинг процессора (`sysfs`), троттлинг ($\ge 80^\circ\text{C}$), лимитер громкости 85% |
-| **IPC-контракт** | `crates/kamish-ipc/src/`, `crates/kamish-core/src/ipc_server.rs` | Общий протокол/кодек сообщений между процессами Kamish |
-| **SPA-интерфейс** | `crates/kamish-web/frontend/src/` | React 19, TypeScript, Vite, Tailwind CSS, отдача через Axum `ServeDir` |
-| **Развёртывание** | `deploy/`, `firmware/` | Сборка прошивки Kamish Linux (Buildroot), udev-правила для XVF3800, systemd служба |
+| **Core Domain** | `crates/kamish-core/src/` | Tokio, Tracing; pure business logic (no HTTP) |
+| **HTTP/WS & Auth** | `crates/kamish-web/src/` | Axum 0.8, Argon2id, SQLite sessions, `kamish_session` cookie |
+| **Setup Wizard** | `crates/kamish-core/src/setup/`, `crates/kamish-web/src/api/setup.rs` | 5-stage setup, `device_state` storage, diagnostic probes, WS events |
+| **Database** | `crates/kamish-core/src/database/`, `crates/kamish-web/src/database.rs` | SQLite WAL, SQLx pool, single-source schema (`PRAGMA user_version`) |
+| **Scheduler** | `crates/kamish-core/src/scheduler/` | Cron-like schedules, timezones, SQLite persistence |
+| **Audio Alerts** | `crates/kamish-core/src/audio/alert.rs` | Self-contained math WAV synthesizer (zero external dependencies) |
+| **AI Orchestrator** | `crates/kamish-core/src/ai/` | Antigravity CLI process (`agy`), dialogue sessions, 14 typed tools |
+| **Multimedia** | `crates/kamish-core/src/music/` | Headless MPV over UNIX socket, radio, YouTube Music stream fallback |
+| **Speech** | `crates/kamish-core/src/speech/` | Pure Rust VAD (RMS+ZCR), keyword spotter, local STT/TTS engines |
+| **System & Net** | `crates/kamish-core/src/{system,network,bluetooth,vpn}/` | BlueZ A2DP, nmcli, Setup AP, Happ VLESS Reality, system WS bus |
+| **Hardware** | `crates/kamish-core/src/system/hardware.rs` | CPU sysfs monitor, throttling ($\ge 80^\circ\text{C}$), 85% volume limiter |
+| **IPC** | `crates/kamish-ipc/src/`, `crates/kamish-core/src/ipc_server.rs` | Inter-process message codec |
+| **SPA UI** | `crates/kamish-web/frontend/src/` | React 19, TypeScript, Vite, Tailwind CSS, Axum `ServeDir` |
+| **Deployment** | `deploy/`, `firmware/` | Kamish Linux (Buildroot), XVF3800 udev rules, systemd unit |
 
 ---
 
-## 5. Стандарт отчётности агента
+## 5. Reporting Standard
 
-В конце выполнения любой задачи агент обязан предоставить структурированный отчёт на русском языке:
+Every task completion MUST conclude with a structured summary in **Russian**:
 
-1. **Что реализовано:** конкретный список завершённых задач.
-2. **Изменённые/созданные файлы:** список путей к файлам с кратким пояснением роли изменений.
-3. **Результаты верификации:** статус выполнения `cargo test` (число пройденных тестов), `cargo check` и `cargo fmt`.
-4. **Ограничения и мок-режимы:** что работает в режиме эмуляции, если физическое железо недоступно.
-5. **Инструкция по проверке:** команды для ручного запуска и проверки функционала разработчиком.
+1. **Что реализовано:** конкретный список изменений.
+2. **Изменённые/созданные файлы:** пути и их роль.
+3. **Результаты верификации:** точные числа `cargo test` (пройдено/провалено), `cargo check`, `cargo fmt`.
+4. **Ограничения и мок-режимы:** статус эмуляции (если физическое железо недоступно).
+5. **Инструкция по проверке:** команды для ручной проверки пользователем.
