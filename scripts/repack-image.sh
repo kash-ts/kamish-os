@@ -162,10 +162,12 @@ ${SUDO} chown root:root \
     "${STAGING_ROOTFS}/etc/systemd/system/"kamish*.service \
     "${STAGING_ROOTFS}/etc/udev/rules.d/99-respeaker.rules" \
     "${STAGING_ROOTFS}/usr/sbin/kamish-dropbear-mgr" \
-    "${STAGING_ROOTFS}/usr/sbin/kamish-healthcheck"
+    "${STAGING_ROOTFS}/usr/sbin/kamish-healthcheck" \
+    "${STAGING_ROOTFS}/usr/sbin/kamish-ap-autostart"
 ${SUDO} chmod 0755 \
     "${STAGING_ROOTFS}/usr/sbin/kamish-dropbear-mgr" \
-    "${STAGING_ROOTFS}/usr/sbin/kamish-healthcheck"
+    "${STAGING_ROOTFS}/usr/sbin/kamish-healthcheck" \
+    "${STAGING_ROOTFS}/usr/sbin/kamish-ap-autostart"
 ${SUDO} chmod 0644 \
     "${STAGING_ROOTFS}/etc/fstab" \
     "${STAGING_ROOTFS}/etc/rauc/system.conf" \
@@ -177,6 +179,13 @@ ${SUDO} chmod 0644 \
 if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager"; then
     ${SUDO} chown -R root:root "${STAGING_ROOTFS}/etc/NetworkManager"
     ${SUDO} chmod 0755 "${STAGING_ROOTFS}/etc/NetworkManager"
+    if ${SUDO} test -f "${STAGING_ROOTFS}/etc/NetworkManager/NetworkManager.conf"; then
+        ${SUDO} chmod 0644 "${STAGING_ROOTFS}/etc/NetworkManager/NetworkManager.conf"
+    fi
+    if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager/dnsmasq-shared.d"; then
+        ${SUDO} chmod 0755 "${STAGING_ROOTFS}/etc/NetworkManager/dnsmasq-shared.d"
+        ${SUDO} find "${STAGING_ROOTFS}/etc/NetworkManager/dnsmasq-shared.d" -type f -exec chmod 0644 {} + 2>/dev/null || true
+    fi
     if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager/system-connections"; then
         ${SUDO} chmod 0700 "${STAGING_ROOTFS}/etc/NetworkManager/system-connections"
         ${SUDO} find "${STAGING_ROOTFS}/etc/NetworkManager/system-connections" -type f -exec chmod 0600 {} + 2>/dev/null || true
@@ -349,7 +358,7 @@ ${SUDO} mkdir -p \
 ${SUDO} ln -sf /etc/systemd/system/kamish-mounts.service \
     "${STAGING_ROOTFS}/etc/systemd/system/sysinit.target.wants/kamish-mounts.service"
 
-for unit in kamish-core.service kamish-web.service kamish.service kamish-healthcheck.service; do
+for unit in kamish-core.service kamish-web.service kamish.service kamish-healthcheck.service kamish-ap-autostart.service; do
     ${SUDO} ln -sf "/etc/systemd/system/${unit}" \
         "${STAGING_ROOTFS}/etc/systemd/system/multi-user.target.wants/${unit}"
 done

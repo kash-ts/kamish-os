@@ -3,17 +3,19 @@ id=Kamish-Setup
 uuid=a1b2c3d4-e5f6-47a8-b9c0-123456789abc
 type=wifi
 interface-name=wlan0
-autoconnect=true
-autoconnect-priority=0
+autoconnect=false
+autoconnect-priority=-100
 
 [wifi]
 mode=ap
 ssid=Kamish-Setup
 band=bg
+channel=6
 
 [ipv4]
 address1=192.168.4.1/24
 method=shared
+never-default=true
 
 [ipv6]
 addr-gen-mode=default

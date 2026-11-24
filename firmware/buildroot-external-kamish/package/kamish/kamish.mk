@@ -26,6 +26,17 @@ define KAMISH_INSTALL_TARGET_CMDS
 		$(TARGET_DIR)/etc/systemd/system/multi-user.target.wants/kamish-web.service
 	ln -sf /etc/systemd/system/kamish.service \
 		$(TARGET_DIR)/etc/systemd/system/multi-user.target.wants/kamish.service
+	if [ -f $(TARGET_DIR)/etc/systemd/system/kamish-ap-autostart.service ]; then \
+		ln -sf /etc/systemd/system/kamish-ap-autostart.service \
+			$(TARGET_DIR)/etc/systemd/system/multi-user.target.wants/kamish-ap-autostart.service; \
+	fi
+	if [ -f $(TARGET_DIR)/usr/sbin/kamish-ap-autostart ]; then \
+		chmod 0755 $(TARGET_DIR)/usr/sbin/kamish-ap-autostart; \
+	fi
+	if [ -d $(TARGET_DIR)/etc/NetworkManager/system-connections ]; then \
+		chmod 0700 $(TARGET_DIR)/etc/NetworkManager/system-connections; \
+		chmod 0600 $(TARGET_DIR)/etc/NetworkManager/system-connections/* || true; \
+	fi
 	# Copy decoupled binaries (kamish-core, kamish-web)
 	for bin in kamish-core kamish-web; do \
 		if [ -f $(@D)/target/aarch64-unknown-linux-gnu/release/$$bin ]; then \

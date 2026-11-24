@@ -58,12 +58,13 @@ pub async fn start_core_daemon(config: &Config) -> AppResult<(CoreState, IpcServ
         }
     });
 
+    let setup_completed = crate::setup::SetupRepository::is_setup_completed(&state.db)
+        .await
+        .unwrap_or(false);
+
     // Spawn diagnostic LED worker
     let led = std::sync::Arc::new(system::LedController::new());
-    let initial_pattern = if crate::setup::SetupRepository::is_setup_completed(&state.db)
-        .await
-        .unwrap_or(false)
-    {
+    let initial_pattern = if setup_completed {
         system::LedPattern::Ready
     } else {
         system::LedPattern::SetupAp
@@ -71,6 +72,18 @@ pub async fn start_core_daemon(config: &Config) -> AppResult<(CoreState, IpcServ
     let led_pattern = std::sync::Arc::new(tokio::sync::RwLock::new(initial_pattern));
     let led_running = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(true));
     led.start_worker(led_pattern.clone(), led_running.clone());
+
+    // Ensure Setup AP is active if initial setup has not been completed yet
+    if !setup_completed {
+        let net = state.network.clone();
+        tokio::spawn(async move {
+            if !net.has_hardware_network().await {
+                return;
+            }
+            tokio::time::sleep(tokio::time::Duration::from_secs(25)).await;
+            net.ensure_setup_ap().await;
+        });
+    }
 
     // Connect LED state to system events
     let mut led_events = state.events.subscribe();

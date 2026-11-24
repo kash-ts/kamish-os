@@ -191,6 +191,17 @@ ${SUDO} test -s "${STAGING_DIR}/etc/rauc/system.conf" || ROOTFS_MISSING+=("/etc/
 ${SUDO} test -s "${STAGING_DIR}/etc/rauc/keyring.pem" || ROOTFS_MISSING+=("/etc/rauc/keyring.pem")
 ${SUDO} test -s "${STAGING_DIR}/etc/systemd/network/20-wired.network" || ROOTFS_MISSING+=("/etc/systemd/network/20-wired.network")
 ${SUDO} test -s "${STAGING_DIR}/usr/lib/firmware/aic8800d80/fmacfw_8800d80_u02.bin" || ROOTFS_MISSING+=("/usr/lib/firmware/aic8800d80 (Wi-Fi firmware)")
+${SUDO} test -x "${STAGING_DIR}/usr/sbin/kamish-ap-autostart" || ROOTFS_MISSING+=("/usr/sbin/kamish-ap-autostart")
+${SUDO} test -s "${STAGING_DIR}/etc/NetworkManager/NetworkManager.conf" || ROOTFS_MISSING+=("/etc/NetworkManager/NetworkManager.conf")
+${SUDO} test -s "${STAGING_DIR}/etc/NetworkManager/system-connections/Kamish-Setup.nmconnection" || ROOTFS_MISSING+=("/etc/NetworkManager/system-connections/Kamish-Setup.nmconnection")
+if ${SUDO} test -f "${STAGING_DIR}/etc/NetworkManager/system-connections/Kamish-Setup.nmconnection"; then
+    NM_CONN_MODE="$(${SUDO} stat -c '%a' "${STAGING_DIR}/etc/NetworkManager/system-connections/Kamish-Setup.nmconnection" 2>/dev/null || true)"
+    if [[ "${NM_CONN_MODE}" != "600" ]]; then
+        ROOTFS_MISSING+=("Kamish-Setup.nmconnection mode=${NM_CONN_MODE} (expected 600)")
+    fi
+fi
+${SUDO} test -s "${STAGING_DIR}/etc/NetworkManager/dnsmasq-shared.d/kamish-setup.conf" || ROOTFS_MISSING+=("/etc/NetworkManager/dnsmasq-shared.d/kamish-setup.conf")
+${SUDO} test -s "${STAGING_DIR}/etc/modules-load.d/aic8800.conf" || ROOTFS_MISSING+=("/etc/modules-load.d/aic8800.conf")
 
 CRLF_BAD="$(${SUDO} python3 - "${STAGING_DIR}" <<'PYEOF'
 import glob
@@ -201,10 +212,15 @@ root = sys.argv[1]
 patterns = [
     os.path.join(root, "usr/sbin/kamish-dropbear-mgr"),
     os.path.join(root, "usr/sbin/kamish-healthcheck"),
+    os.path.join(root, "usr/sbin/kamish-ap-autostart"),
     os.path.join(root, "etc/systemd/system/kamish*.service"),
     os.path.join(root, "etc/fstab"),
     os.path.join(root, "etc/rauc/system.conf"),
     os.path.join(root, "etc/systemd/network/20-wired.network"),
+    os.path.join(root, "etc/NetworkManager/NetworkManager.conf"),
+    os.path.join(root, "etc/NetworkManager/system-connections/*.nmconnection"),
+    os.path.join(root, "etc/NetworkManager/dnsmasq-shared.d/*.conf"),
+    os.path.join(root, "etc/modules-load.d/*.conf"),
 ]
 bad = []
 for pat in patterns:
@@ -236,6 +252,7 @@ SYSTEMD_LINKS=(
     "etc/systemd/system/multi-user.target.wants/kamish-web.service"
     "etc/systemd/system/multi-user.target.wants/kamish.service"
     "etc/systemd/system/multi-user.target.wants/kamish-healthcheck.service"
+    "etc/systemd/system/multi-user.target.wants/kamish-ap-autostart.service"
 )
 for link_rel in "${SYSTEMD_LINKS[@]}"; do
     link_abs="${STAGING_DIR}/${link_rel}"
@@ -255,9 +272,31 @@ for link_rel in "${SYSTEMD_LINKS[@]}"; do
 done
 
 if [[ "${#ROOTFS_MISSING[@]}" -eq 0 ]]; then
-    add_result "RootFS Layout & Services" "PASS" "Image + DTB (${DTB_FOUND}) + kamish user + fstab + RAUC + 5 systemd units"
+    add_result "RootFS Layout & Services" "PASS" "Image + DTB (${DTB_FOUND}) + kamish user + fstab + RAUC + 6 systemd units"
 else
     add_result "RootFS Layout & Services" "FAIL" "Missing/invalid: ${ROOTFS_MISSING[*]}"
+fi
+
+# ------------------------------------------------------------------------------
+# 3a. Wi-Fi & Setup AP Stack Verification
+# ------------------------------------------------------------------------------
+WIFI_STACK_MISSING=()
+for bin_rel in \
+    "usr/sbin/NetworkManager" \
+    "usr/bin/nmcli" \
+    "usr/sbin/wpa_supplicant" \
+    "usr/share/dbus-1/system-services/fi.w1.wpa_supplicant1.service" \
+    "usr/sbin/hostapd" \
+    "usr/sbin/dnsmasq" \
+    "usr/sbin/iw"; do
+    if ! ${SUDO} test -e "${STAGING_DIR}/${bin_rel}"; then
+        WIFI_STACK_MISSING+=("/${bin_rel}")
+    fi
+done
+if [[ "${#WIFI_STACK_MISSING[@]}" -eq 0 ]]; then
+    add_result "Wi-Fi & Setup AP Stack" "PASS" "NetworkManager + nmcli + wpa_supplicant(DBus) + hostapd + dnsmasq + iw"
+else
+    add_result "Wi-Fi & Setup AP Stack" "FAIL" "Missing: ${WIFI_STACK_MISSING[*]}"
 fi
 
 # ------------------------------------------------------------------------------

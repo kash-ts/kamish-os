@@ -1,0 +1,16 @@
+[Unit]
+Description=KAMISH OS Wi-Fi Setup Access Point Autostart
+After=kamish-mounts.service systemd-modules-load.service dbus.service NetworkManager.service
+Wants=kamish-mounts.service NetworkManager.service
+Before=kamish.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/kamish-ap-autostart
+RemainAfterExit=yes
+KillMode=process
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

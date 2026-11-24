@@ -1,0 +1,339 @@
+#!/bin/sh
+# KAMISH OS Wi-Fi Setup AP Autostart Helper
+
+AP_CON_NAME="Kamish-Setup"
+AP_SSID="Kamish-Setup"
+AP_IP="192.168.4.1"
+AP_CHANNEL="6"
+AP_RUN_DIR="/run/kamish-ap"
+NM_CONN_DIR="/etc/NetworkManager/system-connections"
+CORE_DB="/var/lib/kamish/core.db"
+
+log() {
+    echo "[kamish-ap-autostart] $*"
+}
+
+warn() {
+    echo "[kamish-ap-autostart] WARN: $*" >&2
+}
+
+unblock_rfkill() {
+    if command -v rfkill >/dev/null 2>&1; then
+        rfkill unblock all 2>&1 || warn "rfkill unblock all returned $?"
+    fi
+    for soft_file in /sys/class/rfkill/rfkill*/soft; do
+        if [ -w "${soft_file}" ]; then
+            printf '0\n' > "${soft_file}" 2>/dev/null || true
+        fi
+    done
+}
+
+detect_wifi_iface() {
+    if [ -d /sys/class/net/wlan0 ]; then
+        echo "wlan0"
+        return 0
+    fi
+    for wdir in /sys/class/net/*/wireless; do
+        if [ -d "${wdir}" ]; then
+            iface_dir="${wdir%/wireless}"
+            echo "${iface_dir##*/}"
+            return 0
+        fi
+    done
+    return 1
+}
+
+load_wifi_modules() {
+    if command -v modprobe >/dev/null 2>&1; then
+        modprobe aic8800_bsp 2>&1 || warn "modprobe aic8800_bsp failed"
+        modprobe aic8800_fdrv 2>&1 || warn "modprobe aic8800_fdrv failed"
+    else
+        warn "modprobe binary not found"
+    fi
+}
+
+is_setup_completed() {
+    if [ ! -f "${CORE_DB}" ] || ! command -v sqlite3 >/dev/null 2>&1; then
+        return 1
+    fi
+    val="$(sqlite3 "${CORE_DB}" "SELECT value FROM device_state WHERE key='setup:completed' LIMIT 1;" 2>/dev/null || true)"
+    [ "${val}" = "true" ]
+}
+
+has_ethernet_connected() {
+    for dev in /sys/class/net/eth* /sys/class/net/end* /sys/class/net/en*; do
+        [ -d "${dev}" ] || continue
+        oper="$(cat "${dev}/operstate" 2>/dev/null || true)"
+        carrier="$(cat "${dev}/carrier" 2>/dev/null || true)"
+        if [ "${oper}" = "up" ] || [ "${carrier}" = "1" ]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+has_saved_user_wifi_profiles() {
+    for f in "${NM_CONN_DIR}"/*.nmconnection; do
+        [ -e "${f}" ] || continue
+        base="${f##*/}"
+        if [ "${base}" != "Kamish-Setup.nmconnection" ] && grep -q '^type=wifi' "${f}" 2>/dev/null; then
+            return 0
+        fi
+    done
+    return 1
+}
+
+write_hostapd_conf() {
+    iface="$1"
+    with_ht="$2"
+    cat > "${AP_RUN_DIR}/hostapd.conf" <<EOF
+interface=${iface}
+driver=nl80211
+ssid=${AP_SSID}
+hw_mode=g
+channel=${AP_CHANNEL}
+auth_algs=1
+ignore_broadcast_ssid=0
+EOF
+    if [ "${with_ht}" = "1" ]; then
+        cat >> "${AP_RUN_DIR}/hostapd.conf" <<EOF
+ieee80211n=1
+wmm_enabled=1
+EOF
+    fi
+}
+
+write_dnsmasq_conf() {
+    iface="$1"
+    cat > "${AP_RUN_DIR}/dnsmasq.conf" <<EOF
+interface=${iface}
+bind-interfaces
+except-interface=lo
+listen-address=${AP_IP}
+dhcp-range=192.168.4.10,192.168.4.200,255.255.255.0,12h
+dhcp-option=3,${AP_IP}
+dhcp-option=6,${AP_IP}
+address=/kamish.local/${AP_IP}
+address=/setup.kamish/${AP_IP}
+dhcp-leasefile=${AP_RUN_DIR}/dnsmasq.leases
+pid-file=${AP_RUN_DIR}/dnsmasq.pid
+no-resolv
+EOF
+}
+
+stop_pidfile() {
+    pidfile="$1"
+    if [ -f "${pidfile}" ]; then
+        pid="$(cat "${pidfile}" 2>/dev/null || true)"
+        if [ -n "${pid}" ] && kill -0 "${pid}" 2>/dev/null; then
+            kill "${pid}" 2>/dev/null || true
+            sleep 1
+        fi
+        rm -f "${pidfile}"
+    fi
+}
+
+start_hostapd_fallback() {
+    iface="$1"
+    log "Attempting hostapd + dnsmasq fallback AP on ${iface}..."
+
+    if is_setup_completed && has_ethernet_connected; then
+        log "Setup completed and Ethernet active, skipping fallback AP."
+        return 0
+    fi
+
+    if command -v iw >/dev/null 2>&1; then
+        if iw dev "${iface}" link 2>/dev/null | grep -q "Connected to"; then
+            log "Wi-Fi interface ${iface} is already associated in STA mode, skipping fallback AP."
+            return 0
+        fi
+    fi
+
+    if [ ! -x /usr/sbin/hostapd ] || [ ! -x /usr/sbin/dnsmasq ]; then
+        warn "Cannot start fallback AP: /usr/sbin/hostapd or /usr/sbin/dnsmasq missing."
+        return 1
+    fi
+
+    if command -v nmcli >/dev/null 2>&1; then
+        nmcli device set "${iface}" managed no 2>&1 || true
+        sleep 1
+    fi
+
+    stop_pidfile "${AP_RUN_DIR}/hostapd.pid"
+    stop_pidfile "${AP_RUN_DIR}/dnsmasq.pid"
+
+    mkdir -p "${AP_RUN_DIR}"
+    chmod 0755 "${AP_RUN_DIR}"
+
+    ip addr flush dev "${iface}" 2>&1 || true
+    ip addr add "${AP_IP}/24" dev "${iface}" 2>&1 || warn "ip addr add failed on ${iface}"
+    ip link set "${iface}" up 2>&1 || warn "ip link set up failed on ${iface}"
+
+    write_hostapd_conf "${iface}" "1"
+    if ! /usr/sbin/hostapd -B -P "${AP_RUN_DIR}/hostapd.pid" "${AP_RUN_DIR}/hostapd.conf" 2>&1; then
+        warn "hostapd failed with 802.11n enabled; retrying in basic 802.11g mode..."
+        write_hostapd_conf "${iface}" "0"
+        if ! /usr/sbin/hostapd -B -P "${AP_RUN_DIR}/hostapd.pid" "${AP_RUN_DIR}/hostapd.conf" 2>&1; then
+            warn "hostapd fallback failed to start."
+            return 1
+        fi
+    fi
+
+    write_dnsmasq_conf "${iface}"
+    if ! /usr/sbin/dnsmasq --conf-file="${AP_RUN_DIR}/dnsmasq.conf" 2>&1; then
+        warn "dnsmasq failed to start for fallback AP."
+        stop_pidfile "${AP_RUN_DIR}/hostapd.pid"
+        return 1
+    fi
+
+    log "Fallback Setup AP '${AP_SSID}' started at ${AP_IP}/24 on ${iface}."
+    return 0
+}
+
+unblock_rfkill
+
+WIFI_IFACE=""
+if WIFI_IFACE="$(detect_wifi_iface)"; then
+    log "Detected wireless interface: ${WIFI_IFACE}"
+else
+    log "No wireless interface found yet; loading aic8800 modules..."
+    load_wifi_modules
+    i=1
+    while [ "${i}" -le 30 ]; do
+        if WIFI_IFACE="$(detect_wifi_iface)"; then
+            log "Detected wireless interface after ${i}s: ${WIFI_IFACE}"
+            break
+        fi
+        if [ "${i}" -eq 5 ]; then
+            load_wifi_modules
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+fi
+
+if [ -z "${WIFI_IFACE}" ]; then
+    warn "No wireless interface detected after 30s. Diagnostic snapshot:"
+    ls /sys/class/net 2>&1 || true
+    lsmod 2>&1 || true
+    ls -la /usr/lib/firmware/aic8800* /lib/firmware/aic8800* 2>&1 || true
+    exit 0
+fi
+
+ip link set "${WIFI_IFACE}" up 2>&1 || warn "ip link set ${WIFI_IFACE} up returned $?"
+
+if command -v nmcli >/dev/null 2>&1; then
+    nm_ready=0
+    i=1
+    while [ "${i}" -le 15 ]; do
+        if nmcli general status >/dev/null 2>&1; then
+            nm_ready=1
+            break
+        fi
+        sleep 1
+        i=$((i + 1))
+    done
+
+    if [ "${nm_ready}" -eq 1 ]; then
+        nmcli radio wifi on 2>&1 || warn "nmcli radio wifi on failed"
+        nmcli device set "${WIFI_IFACE}" managed yes 2>&1 || warn "nmcli device set managed yes failed"
+
+        dev_ready=0
+        i=1
+        while [ "${i}" -le 15 ]; do
+            dev_state="$(nmcli -t -f DEVICE,STATE dev 2>/dev/null | awk -F: -v d="${WIFI_IFACE}" '$1==d{print $2; exit}')"
+            if [ -n "${dev_state}" ] && [ "${dev_state}" != "unavailable" ] && [ "${dev_state}" != "unmanaged" ]; then
+                dev_ready=1
+                break
+            fi
+            sleep 1
+            i=$((i + 1))
+        done
+        log "NetworkManager device ${WIFI_IFACE} state: ${dev_state:-unknown} (ready=${dev_ready})"
+
+        active_conn="$(nmcli -t -f DEVICE,STATE,CONNECTION dev 2>/dev/null | awk -F: -v d="${WIFI_IFACE}" '$1==d && $2 ~ /^connected/{print $3; exit}')"
+        if [ "${active_conn}" = "${AP_CON_NAME}" ]; then
+            log "Setup AP '${AP_CON_NAME}' is already active."
+            exit 0
+        elif [ -n "${active_conn}" ]; then
+            log "Already connected to user Wi-Fi '${active_conn}', skipping Setup AP."
+            exit 0
+        fi
+
+        if has_saved_user_wifi_profiles; then
+            log "Found saved user Wi-Fi profile(s); waiting up to 15s for auto-connect..."
+            waited=0
+            while [ "${waited}" -lt 15 ]; do
+                sleep 2
+                waited=$((waited + 2))
+                active_conn="$(nmcli -t -f DEVICE,STATE,CONNECTION dev 2>/dev/null | awk -F: -v d="${WIFI_IFACE}" '$1==d && $2 ~ /^connected/{print $3; exit}')"
+                if [ -n "${active_conn}" ] && [ "${active_conn}" != "${AP_CON_NAME}" ]; then
+                    log "Auto-connected to user Wi-Fi '${active_conn}', skipping Setup AP."
+                    exit 0
+                fi
+            done
+        fi
+
+        if is_setup_completed && has_ethernet_connected; then
+            log "Setup is completed and Ethernet is active, skipping Setup AP."
+            exit 0
+        fi
+
+        log "Pre-scanning Wi-Fi networks on ${WIFI_IFACE} before activating Setup AP..."
+        nmcli device wifi rescan ifname "${WIFI_IFACE}" 2>&1 || true
+        sleep 2
+
+        nmcli connection reload 2>&1 || warn "nmcli connection reload failed"
+        if ! nmcli -t -f NAME connection show 2>/dev/null | grep -Fxq "${AP_CON_NAME}"; then
+            log "Creating '${AP_CON_NAME}' connection profile dynamically..."
+            nmcli connection add \
+                type wifi \
+                ifname "${WIFI_IFACE}" \
+                con-name "${AP_CON_NAME}" \
+                autoconnect no \
+                autoconnect-priority -100 \
+                ssid "${AP_SSID}" \
+                mode ap \
+                802-11-wireless.band bg \
+                802-11-wireless.channel "${AP_CHANNEL}" \
+                ipv4.method shared \
+                ipv4.addresses "${AP_IP}/24" \
+                ipv4.never-default yes \
+                ipv6.method ignore 2>&1 || warn "Failed to add ${AP_CON_NAME} profile"
+        elif [ "${WIFI_IFACE}" != "wlan0" ]; then
+            nmcli connection modify "${AP_CON_NAME}" connection.interface-name "${WIFI_IFACE}" 2>&1 || true
+        fi
+
+        if [ "${dev_ready}" -eq 1 ]; then
+            attempt=1
+            while [ "${attempt}" -le 4 ]; do
+                log "Activating '${AP_CON_NAME}' via NetworkManager (attempt ${attempt}/4)..."
+                if nmcli connection up "${AP_CON_NAME}" 2>&1; then
+                    if ip -4 addr show dev "${WIFI_IFACE}" 2>/dev/null | grep -q "${AP_IP}"; then
+                        log "Setup AP '${AP_SSID}' is active on ${WIFI_IFACE} (${AP_IP}/24)."
+                        exit 0
+                    fi
+                    log "nmcli connection up succeeded; waiting briefly for ${AP_IP}..."
+                    sleep 1
+                    if ip -4 addr show dev "${WIFI_IFACE}" 2>/dev/null | grep -q "${AP_IP}"; then
+                        log "Setup AP '${AP_SSID}' is active on ${WIFI_IFACE} (${AP_IP}/24)."
+                        exit 0
+                    fi
+                else
+                    warn "nmcli connection up ${AP_CON_NAME} failed (attempt ${attempt}/4)."
+                fi
+                sleep 3
+                attempt=$((attempt + 1))
+            done
+        else
+            warn "NetworkManager device ${WIFI_IFACE} remained unavailable/unmanaged (check wpa_supplicant D-Bus support)."
+        fi
+    else
+        warn "NetworkManager did not become ready within 15s."
+    fi
+else
+    warn "nmcli binary is missing; using standalone hostapd + dnsmasq fallback."
+fi
+
+start_hostapd_fallback "${WIFI_IFACE}" || warn "All Setup AP startup attempts failed."
+exit 0

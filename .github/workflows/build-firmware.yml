@@ -87,8 +87,14 @@ jobs:
           test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-core.service
           test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-web.service
           test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-mounts.service
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/systemd/system/kamish-ap-autostart.service
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/usr/sbin/kamish-ap-autostart
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/NetworkManager/system-connections/Kamish-Setup.nmconnection
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/NetworkManager/NetworkManager.conf
+          test -f firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/etc/NetworkManager/dnsmasq-shared.d/kamish-setup.conf
           test -f scripts/repack-image.sh
           test -f scripts/verify-image.sh
+          sh -n firmware/buildroot-external-kamish/board/kamish/orangepi-4-pro/overlay/usr/sbin/kamish-ap-autostart
           bash -n scripts/repack-image.sh
           bash -n scripts/verify-image.sh
           bash -n firmware/scripts/gen-keys.sh

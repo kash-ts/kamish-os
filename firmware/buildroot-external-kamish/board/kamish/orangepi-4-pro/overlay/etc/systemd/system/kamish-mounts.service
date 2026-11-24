@@ -3,16 +3,40 @@ Description=KAMISH OS Persistent Data Mounts and Directories Initialization
 DefaultDependencies=no
 After=local-fs.target data.mount
 Wants=data.mount
-Before=sysinit.target kamish.service
+Before=sysinit.target NetworkManager.service kamish-ap-autostart.service kamish.service
 
 [Service]
 Type=oneshot
 ExecStart=/bin/sh -c '\
-    mkdir -p /data/kamish /data/log/kamish /data/network /data/ssh /data/vpn /data/audio; \
+    mkdir -p /data/kamish /data/log/kamish /data/network /data/network/var-lib-nm /data/network/system-connections /data/ssh /data/vpn /data/audio 2>/dev/null || true; \
     chown -R kamish:kamish /data/kamish /data/log/kamish 2>/dev/null || true; \
-    mkdir -p /var/lib/kamish /var/log/kamish; \
+    mkdir -p /var/lib/kamish /var/log/kamish /var/lib/NetworkManager 2>/dev/null || true; \
     mountpoint -q /var/lib/kamish || mount --bind /data/kamish /var/lib/kamish 2>/dev/null || true; \
-    mountpoint -q /var/log/kamish || mount --bind /data/log/kamish /var/log/kamish 2>/dev/null || true'
+    mountpoint -q /var/log/kamish || mount --bind /data/log/kamish /var/log/kamish 2>/dev/null || true; \
+    if [ -d /data/network/var-lib-nm ] && [ -w /data/network/var-lib-nm ]; then \
+        chown root:root /data/network/var-lib-nm && chmod 0755 /data/network/var-lib-nm; \
+        mountpoint -q /var/lib/NetworkManager || mount --bind /data/network/var-lib-nm /var/lib/NetworkManager 2>/dev/null || mount -t tmpfs -o mode=0755 tmpfs /var/lib/NetworkManager 2>/dev/null || true; \
+    else \
+        mountpoint -q /var/lib/NetworkManager || mount -t tmpfs -o mode=0755 tmpfs /var/lib/NetworkManager 2>/dev/null || true; \
+    fi; \
+    if ! mountpoint -q /etc/NetworkManager/system-connections; then \
+        if [ -d /data/network/system-connections ] && [ -w /data/network/system-connections ]; then \
+            if [ -f /etc/NetworkManager/system-connections/Kamish-Setup.nmconnection ]; then \
+                cp -f /etc/NetworkManager/system-connections/Kamish-Setup.nmconnection /data/network/system-connections/Kamish-Setup.nmconnection 2>/dev/null || true; \
+            fi; \
+            chown -R root:root /data/network/system-connections 2>/dev/null || true; \
+            chmod 0700 /data/network/system-connections 2>/dev/null || true; \
+            chmod 0600 /data/network/system-connections/* 2>/dev/null || true; \
+            mount --bind /data/network/system-connections /etc/NetworkManager/system-connections 2>/dev/null || true; \
+        else \
+            mkdir -p /run/kamish-nm-connections; \
+            cp -a /etc/NetworkManager/system-connections/. /run/kamish-nm-connections/ 2>/dev/null || true; \
+            chown -R root:root /run/kamish-nm-connections 2>/dev/null || true; \
+            chmod 0700 /run/kamish-nm-connections 2>/dev/null || true; \
+            chmod 0600 /run/kamish-nm-connections/* 2>/dev/null || true; \
+            mount --bind /run/kamish-nm-connections /etc/NetworkManager/system-connections 2>/dev/null || true; \
+        fi; \
+    fi'
 RemainAfterExit=yes
 
 [Install]
