@@ -190,6 +190,7 @@ ${SUDO} test -d "${STAGING_DIR}/data" || ROOTFS_MISSING+=("/data mountpoint dir"
 ${SUDO} test -s "${STAGING_DIR}/etc/rauc/system.conf" || ROOTFS_MISSING+=("/etc/rauc/system.conf")
 ${SUDO} test -s "${STAGING_DIR}/etc/rauc/keyring.pem" || ROOTFS_MISSING+=("/etc/rauc/keyring.pem")
 ${SUDO} test -s "${STAGING_DIR}/etc/systemd/network/20-wired.network" || ROOTFS_MISSING+=("/etc/systemd/network/20-wired.network")
+${SUDO} test -s "${STAGING_DIR}/lib/firmware/aic8800d80/fmacfw_8800d80_u02.bin" || ROOTFS_MISSING+=("/lib/firmware/aic8800d80 (Wi-Fi firmware)")
 
 CRLF_BAD="$(${SUDO} python3 - "${STAGING_DIR}" <<'PYEOF'
 import glob

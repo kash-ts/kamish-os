@@ -183,6 +183,11 @@ if ${SUDO} test -d "${STAGING_ROOTFS}/etc/NetworkManager"; then
     fi
 fi
 
+if ${SUDO} test -d "${STAGING_ROOTFS}/lib/firmware"; then
+    ${SUDO} chown -R root:root "${STAGING_ROOTFS}/lib/firmware"
+    ${SUDO} chmod -R a+rX "${STAGING_ROOTFS}/lib/firmware"
+fi
+
 if [[ -n "${RAUC_KEYRING}" ]]; then
     if [[ ! -f "${RAUC_KEYRING}" ]]; then
         echo "ERROR: RAUC keyring not found: ${RAUC_KEYRING}" >&2

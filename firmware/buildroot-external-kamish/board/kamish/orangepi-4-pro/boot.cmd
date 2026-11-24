@@ -54,10 +54,12 @@ fi
 
 echo "Booting KAMISH OS from Slot ${boot_slot} (${devtype} ${devnum}:${rootpart})..."
 
-# 4. Resolve root block device (PARTUUID works uniformly on USB and microSD)
+# 4. Resolve root block device (handles NVMe, USB, and microSD/eMMC)
 setenv root_dev ""
 if part uuid ${devtype} ${devnum}:${rootpart} root_partuuid; then
     setenv root_dev "PARTUUID=${root_partuuid}"
+elif test "${devtype}" = "nvme"; then
+    setenv root_dev "/dev/nvme0n1p${rootpart}"
 elif test "${devtype}" = "usb"; then
     setenv root_dev "/dev/sda${rootpart}"
 else
